@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deadline Warden</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Lato:wght@300;400;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<!-- ============================================================
+     МОБІЛЬНА ШАПКА (видима тільки на малих екранах)
+     Містить логотип та кнопку-гамбургер для відкриття сайдбару
+============================================================ -->
+<div class="mobile-header">
+  <div class="logo-wrap">
+    <span class="logo-icon">⏳</span>
+    <span class="logo-text">Deadline<strong>Warden</strong></span>
+  </div>
+  <button class="burger-btn" id="burger-btn" aria-label="Меню">
+    <span></span><span></span><span></span>
+  </button>
+</div>
+
+<!-- Темний оверлей при відкритому мобільному меню -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- ============================================================
+     ОБГОРТКА ВСЬОГО МАКЕТУ: сайдбар + контент
+============================================================ -->
+<div class="app-shell">
+
+  <!-- ===== БІЧНА НАВІГАЦІЙНА ПАНЕЛЬ (SIDEBAR) ===== -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Логотип -->
+    <div class="sidebar-logo">
+      <span class="logo-icon">⏳</span>
+      <span class="logo-text">Deadline<strong>Warden</strong></span>
+    </div>
+
+    <!-- Навігаційні посилання.
+         data-section вказує, який <section> треба показати при кліку. -->
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-link active" data-section="dashboard">
+        <span class="nav-icon">◈</span> Dashboard
+      </a>
+      <a href="#" class="nav-link" data-section="archive">
+        <span class="nav-icon">◎</span> Архів
+      </a>
+      <a href="#" class="nav-link" data-section="analytics">
+        <span class="nav-icon">◉</span> Аналітика
+      </a>
+    </nav>
+
+    <!-- Нижня частина сайдбару: статус -->
+    <div class="sidebar-footer">
+      <div class="status-dot"></div>
+      <span id="sidebar-active-count">0 активних</span>
+    </div>
+  </aside>
+
+  <!-- ===== ОСНОВНИЙ КОНТЕНТ ===== -->
+  <main class="main-content">
+
+    <!-- ─────────────────────────────────────────────
+         РОЗДІЛ 1: DASHBOARD
+    ───────────────────────────────────────────── -->
+    <section id="dashboard" class="section active">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-subtitle">Керуй своїми дедлайнами</p>
+        </div>
+        <!-- Міні-статистика в шапці -->
+        <div class="header-stats">
+          <div class="stat-chip" id="stat-urgent">
+            <span class="chip-num" id="chip-urgent">0</span>
+            <span class="chip-label">Критичних</span>
+          </div>
+          <div class="stat-chip" id="stat-total">
+            <span class="chip-num" id="chip-total">0</span>
+            <span class="chip-label">Всього</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Форма додавання нового завдання -->
+      <div class="card form-card">
+        <h2 class="card-title">Нове завдання</h2>
+        <div class="form-grid">
+          <div class="field">
+            <label for="f-subject">Предмет</label>
+            <input type="text" id="f-subject" placeholder="Наприклад: Алгоритми" />
+          </div>
+          <div class="field">
+            <label for="f-topic">Тема</label>
+            <input type="text" id="f-topic" placeholder="Наприклад: Лабораторна №4" />
+          </div>
+          <div class="field">
+            <label for="f-type">Тип роботи</label>
+            <input type="text" id="f-type" placeholder="Лаб. / КР / Реферат" />
+          </div>
+          <div class="field">
+            <label for="f-deadline">Дата та час дедлайну</label>
+            <input type="datetime-local" id="f-deadline" />
+          </div>
+        </div>
+        <button class="btn-primary" id="btn-add">+ Додати завдання</button>
+      </div>
+
+      <!-- Список карток активних завдань -->
+      <div class="tasks-header">
+        <h2 class="section-heading">Активні завдання</h2>
+        <span class="task-count-badge" id="task-count-badge">0</span>
+      </div>
+      <div id="tasks-list" class="tasks-grid"></div>
+
+    </section><!-- /dashboard -->
+
+
+    <!-- ─────────────────────────────────────────────
+         РОЗДІЛ 2: АРХІВ
+    ───────────────────────────────────────────── -->
+    <section id="archive" class="section">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Архів</h1>
+          <p class="page-subtitle">Виконані завдання</p>
+        </div>
+      </div>
+
+      <!-- Якщо архів порожній — показуємо заглушку, інакше список -->
+      <div id="archive-list" class="archive-list"></div>
+
+    </section><!-- /archive -->
+
+
+    <!-- ─────────────────────────────────────────────
+         РОЗДІЛ 3: АНАЛІТИКА
+    ───────────────────────────────────────────── -->
+    <section id="analytics" class="section">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Аналітика</h1>
+          <p class="page-subtitle">Статистика твоєї роботи</p>
+        </div>
+      </div>
+
+      <!-- Великі карти зі статистикою -->
+      <div class="analytics-grid">
+        <div class="analytics-card accent-blue">
+          <div class="analytics-num" id="an-total">0</div>
+          <div class="analytics-label">Завдань створено</div>
+        </div>
+        <div class="analytics-card accent-green">
+          <div class="analytics-num" id="an-done">0</div>
+          <div class="analytics-label">Виконано вчасно</div>
+        </div>
+        <div class="analytics-card accent-red">
+          <div class="analytics-num" id="an-overdue">0</div>
+          <div class="analytics-label">Прострочено</div>
+        </div>
+        <div class="analytics-card accent-yellow">
+          <div class="analytics-num" id="an-active">0</div>
+          <div class="analytics-label">Активних зараз</div>
+        </div>
+      </div>
+
+      <!-- Таблиця розподілу за предметами -->
+      <div class="card" style="margin-top:28px;">
+        <h2 class="card-title">Розподіл за предметами</h2>
+        <div id="an-subjects-table" class="subjects-table"></div>
+      </div>
+
+    </section><!-- /analytics -->
+
+  </main><!-- /main-content -->
+</div><!-- /app-shell -->
+
+<script src="script.js"></script>
+</body>
+</html>
