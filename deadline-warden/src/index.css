@@ -1,0 +1,310 @@
+/* ============================================================
+   DEADLINE WARDEN v2.0 — NEAT & CONCISE EDITION
+============================================================ */
+
+:root {
+  /* Кольори макета */
+  --sidebar-bg:    #0f1117;
+  --sidebar-width: 240px;
+  --content-bg:    #f9fafb; 
+  --surface:       #ffffff;
+  
+  /* Текст */
+  --text-primary:  #111827;
+  --text-muted:    #6b7280;
+  
+  /* Акценти */
+  --accent:        #3b7eff;
+  --accent-hover:  #2563eb;
+  
+  /* Статуси та Пріоритети */
+  --green:         #10b981;
+  --green-light:   #d1fae5;
+  --yellow:        #f59e0b;
+  --yellow-light:  #fef3c7;
+  --red:           #ef4444;
+  --red-light:     #fee2e2;
+  --gray-light:    #f3f4f6;
+
+  /* Дизайн-токени */
+  --radius-md:     8px;
+  --radius-lg:     12px;
+  --border-light:  1px solid #e5e7eb;
+  --shadow-sm:     0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:     0 4px 12px rgba(0,0,0,.05);
+  --transition:    .2s ease;
+}
+
+/* ── Базове скидання ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+a { text-decoration: none; }
+button { cursor: pointer; font-family: inherit; }
+
+body {
+  font-family: 'Lato', sans-serif;
+  
+  /* Колір фону */
+  background-color: var(--content-bg);
+  
+  /* 100% надійний закодований у Base64 фіолетовий фон із символами */
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjI0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSIjOGI1Y2Y2IiBvcGFjaXR5PSIwLjE1IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXdlaWdodD0iYm9sZCI+PHRleHQgeD0iMjAiIHk9IjQwIiBmb250LXNpemU9IjIyIj57IH08L3RleHQ+PHRleHQgeD0iMTQwIiB5PSI2MCIgZm9udC1zaXplPSIyOCI+4oiRPC90ZXh0Pjx0ZXh0IHg9IjUwIiB5PSIxNDAiIGZvbnQtc2l6ZT0iMjAiPiZsdDsvJmd0OzwvdGV4dD48dGV4dCB4PSIxODAiIHk9IjE3MCIgZm9udC1zaXplPSIyOCI+4ourPC90ZXh0Pjx0ZXh0IHg9IjE2MCIgeT0iMzAiIGZvbnQtc2l6ZT0iMTgiPs67PC90ZXh0Pjx0ZXh0IHg9IjEwIiB5PSIyMTAiIGZvbnQtc2l6ZT0iMjIiPisrPC90ZXh0Pjx0ZXh0IHg9IjkwIiB5PSIyMDAiIGZvbnQtc2l6ZT0iMjQiPs+APC90ZXh0Pjx0ZXh0IHg9IjgwIiB5PSI1MCIgZm9udC1zaXplPSIxOCI+PSZndDs8L3RleHQ+PHRleHQgeD0iMjAwIiB5PSIxMTAiIGZvbnQtc2l6ZT0iMjAiPiE9PC90ZXh0Pjx0ZXh0IHg9IjQwIiB5PSIyMzAiIGZvbnQtc2l6ZT0iMjQiPuKInjwvdGV4dD48dGV4dCB4PSIxMTAiIHk9IjEyMCIgZm9udC1zaXplPSIyMCI+IzwvdGV4dD48L2c+PC9zdmc+");
+  background-repeat: repeat;
+  background-attachment: fixed; /* Щоб фон не смикався при скролінгу */
+  
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ════════════════════════════════════════
+   МАКЕТ ТА САЙДБАР
+════════════════════════════════════════ */
+.app-shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--sidebar-bg);
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; bottom: 0;
+  z-index: 400; transition: transform var(--transition);
+}
+
+.sidebar-logo {
+  padding: 24px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  margin-bottom: 12px; color: #fff;
+  font-family: 'Syne', sans-serif; font-size: 1.1rem;
+}
+
+.nav-link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; margin: 4px 12px;
+  border-radius: var(--radius-md);
+  color: rgba(255,255,255,.55); font-size: 0.9rem;
+  transition: all var(--transition);
+}
+
+.nav-link:hover, .nav-link.active {
+  background: rgba(59, 126, 255, .12); color: #fff; font-weight: 700;
+}
+
+.sidebar-footer {
+  margin-top: auto; padding: 20px;
+  display: flex; align-items: center; gap: 8px;
+  color: rgba(255,255,255,.4); font-size: 0.8rem;
+}
+
+.status-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; }
+
+/* ════════════════════════════════════════
+   ГОЛОВНИЙ КОНТЕНТ (Лаконічне центрування)
+════════════════════════════════════════ */
+.main-content {
+  margin-left: var(--sidebar-width);
+  flex: 1; 
+  padding: 40px 30px; 
+}
+
+.section { 
+  display: none; 
+  animation: fadeIn .25s ease; 
+  width: 100%; 
+  max-width: 1040px; 
+  margin: 0 auto; 
+}
+
+.section.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Шапка ── */
+.page-header { 
+  display: flex; justify-content: space-between; 
+  align-items: flex-end; margin-bottom: 24px; 
+}
+.page-title { font-family: 'Syne', sans-serif; font-size: 1.8rem; font-weight: 800; line-height: 1; }
+.page-subtitle { color: var(--text-muted); font-size: 0.85rem; margin-top: 6px; }
+
+.header-stats { display: flex; gap: 10px; }
+.stat-chip { 
+  background: var(--surface); padding: 8px 16px; 
+  border-radius: var(--radius-md); border: var(--border-light);
+  box-shadow: var(--shadow-sm); text-align: center; 
+}
+.chip-num { 
+  display: block; 
+  font-family: 'Lato', sans-serif; /* Виправлено шрифт для нормального вигляду */
+  font-size: 1.5rem; 
+  font-weight: 800; 
+  color: var(--accent); 
+  line-height: 1.1;
+}
+#stat-urgent .chip-num { color: var(--red); }
+.chip-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+
+/* ════════════════════════════════════════
+   КАРТКИ, ТУЛБАР ТА ФОРМА
+════════════════════════════════════════ */
+.card { 
+  background: var(--surface); border-radius: var(--radius-lg); 
+  border: var(--border-light); box-shadow: var(--shadow-sm); 
+  padding: 20px 24px; margin-bottom: 20px; 
+}
+
+/* Тулбар */
+.toolbar-grid { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.search-box { flex: 2; min-width: 200px; }
+.search-box input { 
+  width: 100%; padding: 10px 14px; font-size: 0.9rem;
+  border: var(--border-light); border-radius: var(--radius-md); 
+  font-family: inherit; outline: none; transition: border-color var(--transition); 
+}
+.search-box input:focus { border-color: var(--accent); }
+
+.filters-group { display: flex; gap: 12px; flex: 1; min-width: 250px; }
+.filters-group select { 
+  flex: 1; padding: 10px; font-size: 0.9rem;
+  border-radius: var(--radius-md); border: var(--border-light); 
+  background: #fff; cursor: pointer; outline: none; 
+}
+
+/* Форма */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.field label { display: block; font-size: 0.7rem; font-weight: 700; margin-bottom: 4px; color: var(--text-muted); text-transform: uppercase; }
+.field input, .field select { width: 100%; padding: 10px; font-size: 0.9rem; border: var(--border-light); border-radius: var(--radius-md); font-family: inherit; }
+.btn-primary { 
+  background: var(--accent); color: #fff; border: none; 
+  padding: 10px 20px; border-radius: var(--radius-md); font-size: 0.9rem;
+  font-weight: 700; transition: background var(--transition); 
+}
+.btn-primary:hover { background: var(--accent-hover); }
+
+/* ════════════════════════════════════════
+   КАРТКИ ЗАВДАНЬ
+════════════════════════════════════════ */
+.tasks-header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.task-count-badge { background: var(--gray-light); color: var(--text-primary); padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
+
+.tasks-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+  gap: 16px; 
+}
+
+.task-card { 
+  background: var(--surface); padding: 18px; border-radius: var(--radius-lg); 
+  border: var(--border-light); border-left: 4px solid #e5e7eb; box-shadow: var(--shadow-sm); 
+  transition: transform var(--transition), box-shadow var(--transition); 
+}
+.task-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+/* Пріоритети */
+.badge-prio { 
+  display: inline-block; padding: 2px 6px; border-radius: 4px; 
+  font-size: 0.65rem; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; 
+}
+.prio-high { background: var(--red-light); color: var(--red); }
+.prio-medium { background: var(--yellow-light); color: var(--yellow); }
+.prio-low { background: var(--gray-light); color: var(--text-muted); }
+
+/* Статуси дедлайнів */
+.status-green { border-left-color: var(--green); }
+.status-yellow { border-left-color: var(--yellow); }
+.status-red { border-left-color: var(--red); }
+
+.task-timer { 
+  display: inline-block; margin: 10px 0; 
+  font-family: 'Lato', sans-serif; /* Виправлено шрифт */
+  font-weight: 700; font-size: 0.8rem; padding: 4px 10px; border-radius: 20px; 
+}
+.status-green .task-timer { background: var(--green-light); color: var(--green); }
+.status-yellow .task-timer { background: var(--yellow-light); color: var(--yellow); }
+.status-red .task-timer { background: var(--red-light); color: var(--red); }
+
+/* ════════════════════════════════════════
+   АНАЛІТИКА
+════════════════════════════════════════ */
+.analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.analytics-card { 
+  background: var(--surface); padding: 24px 20px; border-radius: var(--radius-lg); 
+  border: var(--border-light); border-top: 3px solid transparent;
+  box-shadow: var(--shadow-sm); transition: transform .2s ease; 
+}
+.analytics-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+
+.accent-blue { border-top-color: var(--accent); } 
+.accent-green { border-top-color: var(--green); } 
+.accent-red { border-top-color: var(--red); } 
+.accent-yellow { border-top-color: var(--yellow); }
+
+.analytics-num { 
+  font-family: 'Lato', sans-serif; /* Виправлено шрифт */
+  font-size: 2.4rem; 
+  font-weight: 800; 
+  line-height: 1; 
+  margin-bottom: 4px; 
+  display: block; 
+}
+.analytics-label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Таблиця предметів */
+.subjects-table { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
+.subject-row { display: grid; grid-template-columns: 140px 1fr 30px; align-items: center; gap: 16px; }
+.subject-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.subject-bar-wrap { height: 8px; background: #f1f5f9; border-radius: 10px; overflow: hidden; }
+.subject-bar { height: 100%; background: var(--accent); border-radius: 10px; transition: width 1s ease; }
+.subject-count { font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.9rem; text-align: right; color: var(--text-muted); }
+
+/* ════════════════════════════════════════
+   АРХІВ
+════════════════════════════════════════ */
+.archive-list { display: flex; flex-direction: column; gap: 8px; }
+.archive-item { 
+  display: flex; align-items: center; background: var(--surface); 
+  padding: 12px 16px; border-radius: var(--radius-md); border: var(--border-light);
+  border-left: 3px solid #d1d5db; transition: all 0.2s ease; 
+}
+.archive-item:hover { background: #f9fafb; }
+.archive-item:has(.done) { border-left-color: var(--green); } 
+.archive-item:has(.overdue) { border-left-color: var(--red); }
+
+.archive-item-info { flex: 1; }
+.archive-subject { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; margin-bottom: 2px; }
+.archive-meta { font-size: 0.75rem; color: var(--text-muted); }
+
+.archive-status { padding: 4px 10px; border-radius: 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-right: 12px; }
+.archive-status.done { background: var(--green-light); color: var(--green); }
+.archive-status.overdue { background: var(--red-light); color: var(--red); }
+
+.btn-delete { 
+  background: transparent; color: #d1d5db; border: none; 
+  width: 28px; height: 28px; border-radius: 6px; 
+  display: flex; align-items: center; justify-content: center; 
+  font-size: 1rem; transition: all 0.2s; 
+}
+.btn-delete:hover { background: var(--red-light); color: var(--red); }
+
+/* ════════════════════════════════════════
+   МОБІЛЬНА АДАПТАЦІЯ
+════════════════════════════════════════ */
+.mobile-header { display: none; }
+.burger-btn { background: none; border: none; display: flex; flex-direction: column; gap: 4px; padding: 4px; }
+.burger-btn span { display: block; width: 22px; height: 2px; background: #fff; border-radius: 2px; }
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 350; }
+.sidebar-overlay.active { display: block; }
+
+@media (max-width: 768px) {
+  .mobile-header { 
+    display: flex; position: fixed; top: 0; left: 0; right: 0; 
+    background: var(--sidebar-bg); padding: 14px 20px; z-index: 500; 
+    justify-content: space-between; align-items: center; 
+  }
+  .logo-text { color: #fff; font-family: 'Syne', sans-serif; font-size: 1.05rem; }
+  
+  .sidebar { transform: translateX(-100%); z-index: 600; }
+  .main-content { margin-left: 0; padding: 80px 16px 30px; }
+  
+  .toolbar-grid { flex-direction: column; align-items: stretch; }
+  .filters-group { flex-direction: column; }
+  .header-stats { display: none; }
+  .subject-row { grid-template-columns: 100px 1fr 30px; }
+}
