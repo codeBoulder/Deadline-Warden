@@ -8,11 +8,22 @@ import {
   updateDoc, doc, deleteDoc, serverTimestamp 
 } from 'firebase/firestore';
 
-// --- Допоміжні функції ---
-const getPrioLabel = (p) => {
-  if (p === 'high') return '🔥';
-  if (p === 'medium') return '⚡';
-  return '☕';
+const Icon = ({ name, className = '', filled = false }) => (
+  <span className={`material-symbols-outlined ${filled ? 'filled' : ''} ${className}`}>
+    {name}
+  </span>
+);
+
+const getPrioIcon = (p) => {
+  if (p === 'high') return 'local_fire_department';
+  if (p === 'medium') return 'bolt';
+  return 'coffee';
+};
+
+const getPrioText = (p) => {
+  if (p === 'high') return 'Високий';
+  if (p === 'medium') return 'Середній';
+  return 'Низький';
 };
 
 const getTimeInfo = (deadlineString, estimatedHours) => {
@@ -32,7 +43,6 @@ const formatDate = (iso) => {
   });
 };
 
-// --- Основний компонент App ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -40,9 +50,15 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [pomodoro, setPomodoro] = useState({ active: false, task: null, timeLeft: 25 * 60, isRunning: false });
-
-  // 🌙 Темна тема (зберігається в localStorage)
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+    return () => document.head.removeChild(link);
+  }, []);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -54,7 +70,6 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  // Авторизація та завантаження завдань
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
@@ -69,7 +84,6 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  // 🔔 Push-сповіщення (за 1 годину до дедлайну)
   const tasksRef = useRef(tasks);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
 
@@ -77,27 +91,24 @@ export default function App() {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
-
     const interval = setInterval(() => {
       tasksRef.current.forEach(task => {
         if (task.status !== 'done' && !task.notified) {
           const diffHours = (new Date(task.deadline).getTime() - Date.now()) / (1000 * 60 * 60);
           if (diffHours > 0 && diffHours <= 1) {
             if ("Notification" in window && Notification.permission === "granted") {
-              new Notification("⏳ Дедлайн близько!", {
+              new Notification("Дедлайн близько!", {
                 body: `Завдання "${task.subject}" потрібно здати менш ніж за годину!`,
-                icon: 'https://cdn-icons-png.flaticon.com/512/1000/1000300.png'
               });
-              updateTask(task.id, { notified: true }); // Щоб не спамити
+              updateTask(task.id, { notified: true }); 
             }
           }
         }
       });
-    }, 60000); // Перевірка кожну хвилину
+    }, 60000); 
     return () => clearInterval(interval);
   }, []);
 
-  // Таймер Pomodoro
   useEffect(() => {
     let interval;
     if (pomodoro.active && pomodoro.isRunning && pomodoro.timeLeft > 0) {
@@ -116,68 +127,87 @@ export default function App() {
   };
 
   const updateTask = async (id, data) => await updateDoc(doc(db, "tasks", id), data);
+  
   const deleteTask = async (id) => {
     if (window.confirm('Видалити назавжди?')) await deleteDoc(doc(db, "tasks", id));
   };
+  
   const startPomodoro = (task) => setPomodoro({ active: true, task, timeLeft: 25 * 60, isRunning: true });
 
   return (
-    <>
-      <div className={`sidebar-overlay ${isSidebarOpen ? 'active' : ''}`} onClick={() => setIsSidebarOpen(false)}></div>
-      <div className="app-shell">
+    <div className="app-shell">
+      <button className="mobile-nav-toggle" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+        <Icon name={isSidebarOpen ? "close" : "menu"} />
+      </button>
+
+      <aside className={`sidebar ${isSidebarOpen ? 'active' : ''}`}>
+        <div className="sidebar-logo">
+          <div className="logo-icon"><Icon name="hourglass_bottom" /></div>
+          <span className="logo-text">Deadline<strong>Warden</strong></span>
+        </div>
         
-        {/* Сайдбар */}
-        <aside className="sidebar" style={{ transform: isSidebarOpen ? 'translateX(0)' : '' }}>
-          <div className="sidebar-logo"><span className="logo-icon">⏳</span><span className="logo-text">Deadline<strong>Warden</strong></span></div>
-          
-          <nav className="sidebar-nav">
-            <button className={`nav-link ${activeSection === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveSection('dashboard')}><span className="nav-icon">🏠</span> Dashboard</button>
-            <button className={`nav-link ${activeSection === 'kanban' ? 'active' : ''}`} onClick={() => setActiveSection('kanban')}><span className="nav-icon">📋</span> Канбан-дошка</button>
-            <button className={`nav-link ${activeSection === 'calendar' ? 'active' : ''}`} onClick={() => setActiveSection('calendar')}><span className="nav-icon">📅</span> Календар</button>
-            <button className={`nav-link ${activeSection === 'archive' ? 'active' : ''}`} onClick={() => setActiveSection('archive')}><span className="nav-icon">📦</span> Архів</button>
-          </nav>
+        <nav className="sidebar-nav">
+          <button className={`nav-link ${activeSection === 'dashboard' ? 'active' : ''}`} onClick={() => {setActiveSection('dashboard'); setIsSidebarOpen(false);}}>
+            <Icon name="space_dashboard" className="nav-icon" /> Dashboard
+          </button>
+          <button className={`nav-link ${activeSection === 'kanban' ? 'active' : ''}`} onClick={() => {setActiveSection('kanban'); setIsSidebarOpen(false);}}>
+            <Icon name="view_kanban" className="nav-icon" /> Канбан-дошка
+          </button>
+          <button className={`nav-link ${activeSection === 'calendar' ? 'active' : ''}`} onClick={() => {setActiveSection('calendar'); setIsSidebarOpen(false);}}>
+            <Icon name="calendar_month" className="nav-icon" /> Календар
+          </button>
+          <button className={`nav-link ${activeSection === 'archive' ? 'active' : ''}`} onClick={() => {setActiveSection('archive'); setIsSidebarOpen(false);}}>
+            <Icon name="archive" className="nav-icon" /> Архів
+          </button>
+        </nav>
 
-          <div className="sidebar-footer">
-            <button className="nav-link toggle-theme-btn" onClick={() => setIsDarkMode(!isDarkMode)}>
-              <span className="nav-icon">{isDarkMode ? '☀️' : '🌙'}</span> {isDarkMode ? 'Світла тема' : 'Темна тема'}
-            </button>
-            <div className="user-status">
-              <div className="status-dot" style={{ background: user ? 'var(--green)' : '#94a3b8' }}></div>
-              <span>{user ? `${tasks.filter(t => t.status !== 'done').length} активних` : 'Гість'}</span>
-            </div>
-            {user ? (
-              <button onClick={() => signOut(auth)} className="btn-logout-simple">🚪 Вийти</button>
-            ) : (
-              <button onClick={() => setIsAuthModalOpen(true)} className="btn-login-sidebar">👤 Увійти</button>
-            )}
+        <div className="sidebar-footer">
+          <button className="nav-link toggle-theme-btn" onClick={() => setIsDarkMode(!isDarkMode)}>
+            <Icon name={isDarkMode ? 'light_mode' : 'dark_mode'} className="nav-icon" /> {isDarkMode ? 'Світла тема' : 'Темна тема'}
+          </button>
+          <div className="user-status">
+            <div className="status-dot" style={{ background: user ? 'var(--success)' : 'var(--text-secondary)' }}></div>
+            <span>{user ? `${tasks.filter(t => t.status !== 'done').length} активних завдань` : 'Режим Гостя'}</span>
           </div>
-        </aside>
+          {user ? (
+            <button onClick={() => signOut(auth)} className="btn-logout-simple"><Icon name="logout"/> Вийти</button>
+          ) : (
+            <button onClick={() => setIsAuthModalOpen(true)} className="btn-login-sidebar"><Icon name="login"/> Увійти</button>
+          )}
+        </div>
+      </aside>
 
-        {/* Контент */}
-        <main className="main-content">
-          {activeSection === 'dashboard' && <Dashboard tasks={tasks} addTask={addTask} updateTask={updateTask} user={user} onRequireAuth={() => setIsAuthModalOpen(true)} startPomodoro={startPomodoro} />}
-          {activeSection === 'kanban' && <KanbanBoard tasks={tasks} updateTask={updateTask} startPomodoro={startPomodoro} />}
-          {activeSection === 'calendar' && <CalendarView tasks={tasks} />}
-          {activeSection === 'archive' && <Archive tasks={tasks} updateTask={updateTask} deleteTask={deleteTask} />}
-        </main>
-      </div>
+      <main className="main-content">
+        {activeSection === 'dashboard' && <Dashboard tasks={tasks} addTask={addTask} updateTask={updateTask} user={user} onRequireAuth={() => setIsAuthModalOpen(true)} startPomodoro={startPomodoro} />}
+        {activeSection === 'kanban' && <KanbanBoard tasks={tasks} updateTask={updateTask} startPomodoro={startPomodoro} />}
+        {activeSection === 'calendar' && <CalendarView tasks={tasks} />}
+        {activeSection === 'archive' && <Archive tasks={tasks} updateTask={updateTask} deleteTask={deleteTask} />}
+      </main>
 
       {pomodoro.active && (
         <div className="pomodoro-widget">
-          <div className="pomo-header"><span>🍅 {pomodoro.task.subject}</span><button onClick={() => setPomodoro({ active: false })} className="pomo-close">✖</button></div>
-          <div className="pomo-time">{String(Math.floor(pomodoro.timeLeft / 60)).padStart(2, '0')}:{String(pomodoro.timeLeft % 60).padStart(2, '0')}</div>
+          <div className="pomo-header">
+            <span><Icon name="timer" /> {pomodoro.task.subject}</span>
+            <button onClick={() => setPomodoro({ active: false })} className="pomo-close"><Icon name="close" /></button>
+          </div>
+          <div className="pomo-time">
+            {String(Math.floor(pomodoro.timeLeft / 60)).padStart(2, '0')}:{String(pomodoro.timeLeft % 60).padStart(2, '0')}
+          </div>
           <div className="pomo-controls">
-            <button onClick={() => setPomodoro(p => ({ ...p, isRunning: !p.isRunning }))}>{pomodoro.isRunning ? '⏸ Пауза' : '▶ Старт'}</button>
-            <button onClick={() => setPomodoro(p => ({ ...p, timeLeft: 25 * 60, isRunning: false }))}>⏹ Скинути</button>
+            <button onClick={() => setPomodoro(p => ({ ...p, isRunning: !p.isRunning }))}>
+              <Icon name={pomodoro.isRunning ? "pause" : "play_arrow"} /> {pomodoro.isRunning ? 'Пауза' : 'Старт'}
+            </button>
+            <button onClick={() => setPomodoro(p => ({ ...p, timeLeft: 25 * 60, isRunning: false }))}>
+              <Icon name="replay" /> Скинути
+            </button>
           </div>
         </div>
       )}
       {isAuthModalOpen && <Auth onClose={() => setIsAuthModalOpen(false)} />}
-    </>
+    </div>
   );
 }
 
-// --- Dashboard ---
 function Dashboard({ tasks, addTask, updateTask, user, onRequireAuth, startPomodoro }) {
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
@@ -210,23 +240,51 @@ function Dashboard({ tasks, addTask, updateTask, user, onRequireAuth, startPomod
       subtasks: subtasksList,
       status: 'todo'
     });
-    setSubject(''); setDescription(''); setAttachment(''); setDeadline(''); setEstimatedHours(''); setSubtasksList([]);
+    setSubject('');
+    setDescription('');
+    setAttachment('');
+    setDeadline('');
+    setEstimatedHours('');
+    setSubtasksList([]);
   };
 
   return (
     <section className="section active">
-      <div className="page-header"><div><h1 className="page-title">Dashboard</h1><p className="page-subtitle">Ваш центр керування часом</p></div></div>
+      <div className="page-header">
+        <h1 className="page-title">Dashboard</h1>
+        <p className="page-subtitle">Ваш центр керування часом та дедлайнами.</p>
+      </div>
 
       <div className="card form-card">
-        <h2 className="card-title">➕ Нове завдання</h2>
+        <h2 className="card-title"><Icon name="add_circle" /> Створити нове завдання</h2>
         <div className="form-grid">
-          <div className="field"><label>Предмет / Назва</label><input type="text" value={subject} onChange={e => setSubject(e.target.value)} /></div>
-          <div className="field"><label>Дедлайн</label><input type="datetime-local" value={deadline} onChange={e => setDeadline(e.target.value)} /></div>
-          <div className="field"><label>Оцінка часу (год)</label><input type="number" min="0.5" step="0.5" placeholder="Напр: 4" value={estimatedHours} onChange={e => setEstimatedHours(e.target.value)} /></div>
-          <div className="field"><label>Посилання (Матеріали)</label><input type="url" placeholder="https://docs.google.com/..." value={attachment} onChange={e => setAttachment(e.target.value)} /></div>
+          <div className="field">
+            <label>Предмет / Назва</label>
+            <input type="text" placeholder="Назва завдання..." value={subject} onChange={e => setSubject(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Пріоритет</label>
+            <select value={priority} onChange={e => setPriority(e.target.value)}>
+              <option value="high">Високий</option>
+              <option value="medium">Середній</option>
+              <option value="low">Низький</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>Дедлайн</label>
+            <input type="datetime-local" value={deadline} onChange={e => setDeadline(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Оцінка часу (год)</label>
+            <input type="number" min="0.5" step="0.5" placeholder="Напр: 4" value={estimatedHours} onChange={e => setEstimatedHours(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Посилання (Матеріали)</label>
+            <input type="url" placeholder="https://docs.google.com/..." value={attachment} onChange={e => setAttachment(e.target.value)} />
+          </div>
           <div className="field" style={{ gridColumn: '1 / -1' }}>
-            <label>Детальний опис / Умови / Формули</label>
-            <textarea className="textarea-field" rows="3" placeholder="Вимоги викладача, нотатки..." value={description} onChange={e => setDescription(e.target.value)} />
+            <label>Детальний опис / Умови</label>
+            <textarea className="textarea-field" placeholder="Вимоги викладача, нотатки..." value={description} onChange={e => setDescription(e.target.value)} />
           </div>
         </div>
         
@@ -234,11 +292,17 @@ function Dashboard({ tasks, addTask, updateTask, user, onRequireAuth, startPomod
           <label className="field-label">Підзадачі (Чекліст)</label>
           <div className="subtask-input-group">
             <input type="text" placeholder="Додати крок..." value={subtaskInput} onChange={e => setSubtaskInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddSubtask()} />
-            <button onClick={handleAddSubtask} className="btn-secondary">Додати</button>
+            <button onClick={handleAddSubtask} className="btn-secondary">Додати крок</button>
           </div>
-          <ul className="subtasks-preview">{subtasksList.map((st, i) => <li key={i}>🔹 {st.text}</li>)}</ul>
+          {subtasksList.length > 0 && (
+            <ul className="subtasks-preview">
+              {subtasksList.map((st, i) => <li key={i}><Icon name="check_box_outline_blank" className="text-muted"/> {st.text}</li>)}
+            </ul>
+          )}
         </div>
-        <button className="btn-primary mt-3" onClick={handleAddTask}>Створити завдання</button>
+        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="btn-primary" onClick={handleAddTask}><Icon name="add" /> Створити завдання</button>
+        </div>
       </div>
 
       <div className="tasks-grid">
@@ -248,11 +312,8 @@ function Dashboard({ tasks, addTask, updateTask, user, onRequireAuth, startPomod
   );
 }
 
-// --- Картка завдання (З підтримкою розширення) ---
 function TaskCardItem({ task, updateTask, startPomodoro }) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const timeInfo = getTimeInfo(task.deadline, task.estimatedHours);
-  
   const doneSubtasks = task.subtasks?.filter(s => s.isDone).length || 0;
   const totalSubtasks = task.subtasks?.length || 0;
   const progress = totalSubtasks === 0 ? 0 : Math.round((doneSubtasks / totalSubtasks) * 100);
@@ -262,37 +323,32 @@ function TaskCardItem({ task, updateTask, startPomodoro }) {
     updateTask(task.id, { subtasks: newSubtasks });
   };
 
-  const isLongDesc = task.description && task.description.length > 80;
-  const displayDesc = isExpanded ? task.description : task.description?.slice(0, 80) + (isLongDesc && !isExpanded ? '...' : '');
-
   return (
-    <div className={`task-card ${timeInfo.class}`}>
+    <div className={`task-card prio-${task.priority}`}>
       <div className="task-card-top">
-        <span className={`badge-prio prio-${task.priority}`}>{getPrioLabel(task.priority)}</span>
+        <div className="badge-wrapper">
+          <span className={`badge-prio prio-${task.priority}`}>
+            <Icon name={getPrioIcon(task.priority)} /> {getPrioText(task.priority)}
+          </span>
+          {task.attachment && (
+            <a href={task.attachment} target="_blank" rel="noreferrer" className="attachment-link">
+              <Icon name="link" /> Матеріали
+            </a>
+          )}
+        </div>
+        
         <h3 className="task-subject">{task.subject}</h3>
         
         {task.description && (
-          <div className="task-description">
-            {displayDesc}
-            {isLongDesc && (
-              <button className="btn-link" onClick={() => setIsExpanded(!isExpanded)}>
-                {isExpanded ? 'Згорнути' : 'Читати далі'}
-              </button>
-            )}
-          </div>
+          <div className="task-description">{task.description.length > 100 ? task.description.slice(0, 100) + '...' : task.description}</div>
         )}
-
-        {task.attachment && (
-          <a href={task.attachment} target="_blank" rel="noreferrer" className="attachment-link">🔗 Відкрити матеріали</a>
-        )}
-
-        {timeInfo.warning && <div className="warning-badge">⚠️ Часу менше, ніж оцінено!</div>}
       </div>
 
       {totalSubtasks > 0 && (
         <div className="task-progress">
+          <div className="progress-header"><span>Прогрес виконання</span><span>{progress}%</span></div>
           <div className="progress-bar-wrap">
-            <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress === 100 ? 'var(--green)' : 'var(--accent)' }}></div>
+            <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
           </div>
           <div className="subtasks-list">
             {task.subtasks.map(st => (
@@ -306,17 +362,28 @@ function TaskCardItem({ task, updateTask, startPomodoro }) {
       )}
 
       <div className="task-card-bottom">
-        <div className="task-timer">{timeInfo.text}</div>
-        <button className="btn-pomodoro" onClick={() => startPomodoro(task)}>🍅 Фокус</button>
-        <button className="btn-done-circle" title="Позначити виконаним" onClick={() => updateTask(task.id, { status: 'done' })}>✓</button>
+        <div className={`task-timer ${timeInfo.class}`}>
+          <Icon name="schedule" /> {timeInfo.text}
+        </div>
+        <div className="task-actions">
+          <button className="btn-pomodoro" title="Запустити таймер фокусу" onClick={() => startPomodoro(task)}>
+            <Icon name="timer" />
+          </button>
+          <button className="btn-done-circle" title="Позначити виконаним" onClick={() => updateTask(task.id, { status: 'done' })}>
+            <Icon name="done" />
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// --- KanbanBoard (Без змін, адаптується під тему) ---
 function KanbanBoard({ tasks, updateTask, startPomodoro }) {
-  const columns = [{ id: 'todo', title: '⏳ Треба зробити' }, { id: 'in-progress', title: '🔥 В процесі' }, { id: 'done', title: '✅ Виконано' }];
+  const columns = [
+    { id: 'todo', title: 'Треба зробити', icon: 'format_list_bulleted' }, 
+    { id: 'in-progress', title: 'В процесі', icon: 'trending_up' }, 
+    { id: 'done', title: 'Виконано', icon: 'task_alt' }
+  ];
   const handleDrop = (e, status) => updateTask(e.dataTransfer.getData('taskId'), { status });
 
   return (
@@ -325,14 +392,14 @@ function KanbanBoard({ tasks, updateTask, startPomodoro }) {
       <div className="kanban-board">
         {columns.map(col => (
           <div key={col.id} className="kanban-column" onDragOver={e => e.preventDefault()} onDrop={e => handleDrop(e, col.id)}>
-            <h3 className="kanban-col-title">{col.title}</h3>
+            <h3 className="kanban-col-title"><Icon name={col.icon} /> {col.title}</h3>
             <div className="kanban-col-content">
               {tasks.filter(t => t.status === col.id).map(task => (
                 <div key={task.id} className="kanban-card" draggable onDragStart={e => e.dataTransfer.setData('taskId', task.id)}>
                   <h4>{task.subject}</h4>
-                  <div className="kanban-card-actions mt-2">
-                    <span className="kanban-date">{formatDate(task.deadline).split(',')[0]}</span>
-                    {col.id !== 'done' && <button className="btn-icon" onClick={() => startPomodoro(task)}>🍅</button>}
+                  <div className="kanban-card-actions">
+                    <span className="kanban-date"><Icon name="event" /> {formatDate(task.deadline).split(',')[0]}</span>
+                    {col.id !== 'done' && <button className="btn-secondary" style={{padding: '6px 10px'}} onClick={() => startPomodoro(task)}><Icon name="timer" /></button>}
                   </div>
                 </div>
               ))}
@@ -344,7 +411,6 @@ function KanbanBoard({ tasks, updateTask, startPomodoro }) {
   );
 }
 
-// --- CalendarView (Без змін, адаптується під тему) ---
 function CalendarView({ tasks }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
@@ -354,12 +420,12 @@ function CalendarView({ tasks }) {
 
   return (
     <section className="section active">
-      <div className="page-header calendar-header">
-        <h1 className="page-title">Календар Дедлайнів</h1>
+      <div className="calendar-header">
+        <h1 className="page-title">Календар</h1>
         <div className="calendar-nav">
-          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}>◀</button>
+          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}><Icon name="chevron_left" /></button>
           <h2>{currentDate.toLocaleString('uk-UA', { month: 'long', year: 'numeric' })}</h2>
-          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}>▶</button>
+          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}><Icon name="chevron_right" /></button>
         </div>
       </div>
       <div className="calendar-grid">
@@ -380,32 +446,37 @@ function CalendarView({ tasks }) {
   );
 }
 
-// --- Оновлений красивий Архів ---
 function Archive({ tasks, updateTask, deleteTask }) {
   const archiveTasks = tasks.filter(t => t.status === 'done' || t.status === 'overdue');
 
   return (
     <section className="section active">
-      <div className="page-header"><h1 className="page-title">Архів</h1><p className="page-subtitle">Виконані та пропущені завдання</p></div>
+      <div className="page-header">
+        <h1 className="page-title">Архів</h1>
+        <p className="page-subtitle">Історія виконаних та пропущених завдань</p>
+      </div>
       
       {archiveTasks.length === 0 ? (
-        <div className="empty-state" style={{ textAlign: 'center', marginTop: '50px', color: 'var(--text-muted)' }}>
-          <span style={{ fontSize: '3rem' }}>🍃</span><p>Архів порожній</p>
+        <div style={{ textAlign: 'center', marginTop: '80px', color: 'var(--text-secondary)' }}>
+          <Icon name="inbox" style={{ fontSize: '4rem', opacity: 0.5, marginBottom: '16px' }} />
+          <h3>Архів порожній</h3>
         </div>
       ) : (
         <div className="archive-grid">
           {archiveTasks.map(task => (
-            <div key={task.id} className={`archive-card ${task.status}`}>
+            <div key={task.id} className="archive-card">
               <div className="archive-header">
-                <span className={`archive-badge ${task.status}`}>{task.status === 'done' ? '✅ Виконано' : '❌ Прострочено'}</span>
+                <span className={`archive-badge ${task.status}`}>
+                  <Icon name={task.status === 'done' ? 'check_circle' : 'cancel'} /> 
+                  {task.status === 'done' ? 'Виконано' : 'Прострочено'}
+                </span>
                 <span className="archive-date">{formatDate(task.deadline).split(',')[0]}</span>
               </div>
-              <h3 style={{ marginBottom: '8px' }}>{task.subject}</h3>
-              {task.description && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{task.description.slice(0, 50)}...</p>}
+              <h3 style={{ marginBottom: '12px', fontSize: '1.2rem' }}>{task.subject}</h3>
               
               <div className="archive-actions">
-                <button className="btn-restore" onClick={() => updateTask(task.id, { status: 'todo' })}>🔄 Відновити</button>
-                <button className="btn-delete-forever" onClick={() => deleteTask(task.id)}>🗑 Видалити</button>
+                <button className="btn-restore" onClick={() => updateTask(task.id, { status: 'todo' })}><Icon name="restore" /> Відновити</button>
+                <button className="btn-delete-forever" onClick={() => deleteTask(task.id)}><Icon name="delete" /> Видалити</button>
               </div>
             </div>
           ))}
