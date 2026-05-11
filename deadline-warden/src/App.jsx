@@ -1,18 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './index.css';
 import Auth from './Auth'; 
 import { auth, db } from './firebase'; 
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  doc, 
-  deleteDoc,
-  serverTimestamp 
+  collection, query, where, onSnapshot, addDoc, 
+  updateDoc, doc, deleteDoc, serverTimestamp 
 } from 'firebase/firestore';
 
 // --- Допоміжні функції ---
@@ -22,12 +15,15 @@ const getPrioLabel = (p) => {
   return '☕';
 };
 
-const getTimeInfo = (deadlineString) => {
-  const diff = new Date(deadlineString).getTime() - Date.now();
-  if (diff <= 0) return { text: 'Час вийшов', class: 'status-red', isUrgent: false };
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  if (hours < 24) return { text: `${hours} год`, class: 'status-yellow', isUrgent: true };
-  return { text: `${Math.floor(hours / 24)} дн`, class: 'status-green', isUrgent: false };
+const getTimeInfo = (deadlineString, estimatedHours) => {
+  const diffMs = new Date(deadlineString).getTime() - Date.now();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  
+  if (diffMs <= 0) return { text: 'Час вийшов', class: 'status-red', warning: false };
+  const warning = estimatedHours && diffHours < estimatedHours;
+
+  if (diffHours < 24) return { text: `${Math.floor(diffHours)} год`, class: 'status-yellow', warning };
+  return { text: `${Math.floor(diffHours / 24)} дн`, class: 'status-green', warning };
 };
 
 const formatDate = (iso) => {
@@ -43,328 +39,304 @@ export default function App() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [pomodoro, setPomodoro] = useState({ active: false, task: null, timeLeft: 25 * 60, isRunning: false });
 
-  // 1. Слідкуємо за станом авторизації
+  // 🌙 Темна тема (зберігається в localStorage)
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
+    if (isDarkMode) {
+      document.body.classList.add('dark-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.body.classList.remove('dark-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  // Авторизація та завантаження завдань
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
   }, []);
 
-  // 2. Отримуємо завдання з Firestore (тільки для поточного юзера)
   useEffect(() => {
-    if (!user) {
-      setTasks([]); // Якщо вийшов — очищуємо список
-      return;
-    }
-
+    if (!user) { setTasks([]); return; }
     const q = query(collection(db, "tasks"), where("userId", "==", user.uid));
-    
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tasksData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setTasks(tasksData);
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-
     return () => unsubscribe();
   }, [user]);
 
-  // 3. Перевірка прострочених завдань раз на хвилину
+  // 🔔 Push-сповіщення (за 1 годину до дедлайну)
+  const tasksRef = useRef(tasks);
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+
   useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
     const interval = setInterval(() => {
-      tasks.forEach(async (task) => {
-        if (task.status === 'active' && new Date(task.deadline).getTime() < Date.now()) {
-          const taskRef = doc(db, "tasks", task.id);
-          await updateDoc(taskRef, { status: 'overdue' });
+      tasksRef.current.forEach(task => {
+        if (task.status !== 'done' && !task.notified) {
+          const diffHours = (new Date(task.deadline).getTime() - Date.now()) / (1000 * 60 * 60);
+          if (diffHours > 0 && diffHours <= 1) {
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification("⏳ Дедлайн близько!", {
+                body: `Завдання "${task.subject}" потрібно здати менш ніж за годину!`,
+                icon: 'https://cdn-icons-png.flaticon.com/512/1000/1000300.png'
+              });
+              updateTask(task.id, { notified: true }); // Щоб не спамити
+            }
+          }
         }
       });
-    }, 60000);
+    }, 60000); // Перевірка кожну хвилину
     return () => clearInterval(interval);
-  }, [tasks]);
+  }, []);
 
-  // Операції з БД
+  // Таймер Pomodoro
+  useEffect(() => {
+    let interval;
+    if (pomodoro.active && pomodoro.isRunning && pomodoro.timeLeft > 0) {
+      interval = setInterval(() => setPomodoro(prev => ({ ...prev, timeLeft: prev.timeLeft - 1 })), 1000);
+    } else if (pomodoro.timeLeft === 0) {
+      alert(`Час вийшов! Ви добре попрацювали над: ${pomodoro.task.subject}`);
+      setPomodoro(prev => ({ ...prev, isRunning: false }));
+    }
+    return () => clearInterval(interval);
+  }, [pomodoro]);
+
   const addTask = async (newTask) => {
-    if (!user) {
-      setIsAuthModalOpen(true);
-      return;
-    }
-    try {
-      await addDoc(collection(db, "tasks"), {
-        ...newTask,
-        userId: user.uid,
-        createdAt: serverTimestamp()
-      });
-      setActiveSection('dashboard');
-    } catch (e) {
-      console.error("Помилка додавання:", e);
-    }
+    if (!user) return setIsAuthModalOpen(true);
+    await addDoc(collection(db, "tasks"), { ...newTask, userId: user.uid, createdAt: serverTimestamp(), notified: false });
+    setActiveSection('dashboard');
   };
 
-  const markAsDone = async (id) => {
-    const taskRef = doc(db, "tasks", id);
-    await updateDoc(taskRef, { status: 'done' });
-  };
-
+  const updateTask = async (id, data) => await updateDoc(doc(db, "tasks", id), data);
   const deleteTask = async (id) => {
-    if (window.confirm('Видалити назавжди?')) {
-      await deleteDoc(doc(db, "tasks", id));
-    }
+    if (window.confirm('Видалити назавжди?')) await deleteDoc(doc(db, "tasks", id));
   };
-
-  const handleLogout = () => signOut(auth);
-
-  const activeTasksCount = tasks.filter(t => t.status === 'active').length;
+  const startPomodoro = (task) => setPomodoro({ active: true, task, timeLeft: 25 * 60, isRunning: true });
 
   return (
     <>
-      {/* Мобільний хедер */}
-      <div className="mobile-header">
-        <div className="logo-wrap">
-          <span className="logo-icon">⏳</span>
-          <span className="logo-text">Deadline<strong>Warden</strong></span>
-        </div>
-        <button className="burger-btn" onClick={() => setIsSidebarOpen(true)}>
-          <span></span><span></span><span></span>
-        </button>
-      </div>
-
-      <div 
-        className={`sidebar-overlay ${isSidebarOpen ? 'active' : ''}`} 
-        onClick={() => setIsSidebarOpen(false)}
-      ></div>
-
+      <div className={`sidebar-overlay ${isSidebarOpen ? 'active' : ''}`} onClick={() => setIsSidebarOpen(false)}></div>
       <div className="app-shell">
+        
         {/* Сайдбар */}
         <aside className="sidebar" style={{ transform: isSidebarOpen ? 'translateX(0)' : '' }}>
-          <div className="sidebar-logo">
-            <span className="logo-icon">⏳</span>
-            <span className="logo-text">Deadline<strong>Warden</strong></span>
-          </div>
-
+          <div className="sidebar-logo"><span className="logo-icon">⏳</span><span className="logo-text">Deadline<strong>Warden</strong></span></div>
+          
           <nav className="sidebar-nav">
-            <button className={`nav-link ${activeSection === 'dashboard' ? 'active' : ''}`} onClick={() => { setActiveSection('dashboard'); setIsSidebarOpen(false); }}>
-              <span className="nav-icon">🏠</span> Dashboard
-            </button>
-            <button className={`nav-link ${activeSection === 'archive' ? 'active' : ''}`} onClick={() => { setActiveSection('archive'); setIsSidebarOpen(false); }}>
-              <span className="nav-icon">📦</span> Архів
-            </button>
-            <button className={`nav-link ${activeSection === 'analytics' ? 'active' : ''}`} onClick={() => { setActiveSection('analytics'); setIsSidebarOpen(false); }}>
-              <span className="nav-icon">📊</span> Аналітика
-            </button>
+            <button className={`nav-link ${activeSection === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveSection('dashboard')}><span className="nav-icon">🏠</span> Dashboard</button>
+            <button className={`nav-link ${activeSection === 'kanban' ? 'active' : ''}`} onClick={() => setActiveSection('kanban')}><span className="nav-icon">📋</span> Канбан-дошка</button>
+            <button className={`nav-link ${activeSection === 'calendar' ? 'active' : ''}`} onClick={() => setActiveSection('calendar')}><span className="nav-icon">📅</span> Календар</button>
+            <button className={`nav-link ${activeSection === 'archive' ? 'active' : ''}`} onClick={() => setActiveSection('archive')}><span className="nav-icon">📦</span> Архів</button>
           </nav>
 
-          <div className="sidebar-footer" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '15px'}}>
-            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-              <div className="status-dot" style={{background: user ? 'var(--green)' : '#94a3b8'}}></div>
-              <span>{user ? `${activeTasksCount} активних` : 'Гість'}</span>
+          <div className="sidebar-footer">
+            <button className="nav-link toggle-theme-btn" onClick={() => setIsDarkMode(!isDarkMode)}>
+              <span className="nav-icon">{isDarkMode ? '☀️' : '🌙'}</span> {isDarkMode ? 'Світла тема' : 'Темна тема'}
+            </button>
+            <div className="user-status">
+              <div className="status-dot" style={{ background: user ? 'var(--green)' : '#94a3b8' }}></div>
+              <span>{user ? `${tasks.filter(t => t.status !== 'done').length} активних` : 'Гість'}</span>
             </div>
-            
             {user ? (
-              <button onClick={handleLogout} className="btn-logout-simple">
-                🚪 Вийти з акаунту
-              </button>
+              <button onClick={() => signOut(auth)} className="btn-logout-simple">🚪 Вийти</button>
             ) : (
-              <button onClick={() => setIsAuthModalOpen(true)} className="btn-login-sidebar">
-                👤 Увійти / Реєстрація
-              </button>
+              <button onClick={() => setIsAuthModalOpen(true)} className="btn-login-sidebar">👤 Увійти</button>
             )}
           </div>
         </aside>
 
-        {/* Основний контент */}
+        {/* Контент */}
         <main className="main-content">
-          {activeSection === 'dashboard' && (
-            <Dashboard 
-              tasks={tasks} 
-              addTask={addTask} 
-              markAsDone={markAsDone} 
-              user={user}
-              onRequireAuth={() => setIsAuthModalOpen(true)}
-            />
-          )}
-          {activeSection === 'archive' && <Archive tasks={tasks} deleteTask={deleteTask} />}
-          {activeSection === 'analytics' && <Analytics tasks={tasks} />}
+          {activeSection === 'dashboard' && <Dashboard tasks={tasks} addTask={addTask} updateTask={updateTask} user={user} onRequireAuth={() => setIsAuthModalOpen(true)} startPomodoro={startPomodoro} />}
+          {activeSection === 'kanban' && <KanbanBoard tasks={tasks} updateTask={updateTask} startPomodoro={startPomodoro} />}
+          {activeSection === 'calendar' && <CalendarView tasks={tasks} />}
+          {activeSection === 'archive' && <Archive tasks={tasks} updateTask={updateTask} deleteTask={deleteTask} />}
         </main>
       </div>
 
-      {/* Модалка авторизації */}
+      {pomodoro.active && (
+        <div className="pomodoro-widget">
+          <div className="pomo-header"><span>🍅 {pomodoro.task.subject}</span><button onClick={() => setPomodoro({ active: false })} className="pomo-close">✖</button></div>
+          <div className="pomo-time">{String(Math.floor(pomodoro.timeLeft / 60)).padStart(2, '0')}:{String(pomodoro.timeLeft % 60).padStart(2, '0')}</div>
+          <div className="pomo-controls">
+            <button onClick={() => setPomodoro(p => ({ ...p, isRunning: !p.isRunning }))}>{pomodoro.isRunning ? '⏸ Пауза' : '▶ Старт'}</button>
+            <button onClick={() => setPomodoro(p => ({ ...p, timeLeft: 25 * 60, isRunning: false }))}>⏹ Скинути</button>
+          </div>
+        </div>
+      )}
       {isAuthModalOpen && <Auth onClose={() => setIsAuthModalOpen(false)} />}
     </>
   );
 }
 
-// --- Компонент Dashboard ---
-function Dashboard({ tasks, addTask, markAsDone, user, onRequireAuth }) {
-  const [search, setSearch] = useState('');
-  const [filterSubject, setFilterSubject] = useState('all');
-  const [filterPriority, setFilterPriority] = useState('all');
-
+// --- Dashboard ---
+function Dashboard({ tasks, addTask, updateTask, user, onRequireAuth, startPomodoro }) {
   const [subject, setSubject] = useState('');
-  const [topic, setTopic] = useState('');
+  const [description, setDescription] = useState('');
+  const [attachment, setAttachment] = useState('');
   const [priority, setPriority] = useState('medium');
   const [deadline, setDeadline] = useState('');
+  const [estimatedHours, setEstimatedHours] = useState('');
+  const [subtaskInput, setSubtaskInput] = useState('');
+  const [subtasksList, setSubtasksList] = useState([]);
 
-  const uniqueSubjects = useMemo(() => [...new Set(tasks.map(t => t.subject))], [tasks]);
+  const activeTasks = tasks.filter(t => t.status === 'todo' || t.status === 'in-progress').sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
 
-  const activeTasks = tasks.filter(t => t.status === 'active');
-  const filteredTasks = useMemo(() => {
-    return activeTasks.filter(t => {
-      const matchSearch = t.subject.toLowerCase().includes(search.toLowerCase()) || 
-                          t.topic.toLowerCase().includes(search.toLowerCase());
-      const matchSubj = filterSubject === 'all' || t.subject === filterSubject;
-      const matchPrio = filterPriority === 'all' || t.priority === filterPriority;
-      return matchSearch && matchSubj && matchPrio;
-    }).sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
-  }, [activeTasks, search, filterSubject, filterPriority]);
-
-  const urgentCount = filteredTasks.filter(t => getTimeInfo(t.deadline).isUrgent).length;
+  const handleAddSubtask = () => {
+    if (!subtaskInput.trim()) return;
+    setSubtasksList([...subtasksList, { id: Date.now(), text: subtaskInput, isDone: false }]);
+    setSubtaskInput('');
+  };
 
   const handleAddTask = () => {
-    if (!user) {
-      onRequireAuth();
-      return;
-    }
-    if (!subject.trim() || !deadline) {
-      alert('Заповніть предмет та дату!');
-      return;
-    }
+    if (!user) return onRequireAuth();
+    if (!subject.trim() || !deadline) return alert('Заповніть предмет та дату!');
+    
     addTask({
       subject: subject.trim(),
-      topic: topic.trim() || 'Без опису',
+      description: description.trim(),
+      attachment: attachment.trim(),
       priority,
       deadline,
-      status: 'active'
+      estimatedHours: parseFloat(estimatedHours) || 0,
+      subtasks: subtasksList,
+      status: 'todo'
     });
-    setSubject(''); setTopic(''); setDeadline(''); setPriority('medium');
+    setSubject(''); setDescription(''); setAttachment(''); setDeadline(''); setEstimatedHours(''); setSubtasksList([]);
   };
 
   return (
     <section className="section active">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">Твої актуальні завдання та дедлайни</p>
-        </div>
-        <div className="header-stats">
-          <div className="stat-chip" id="stat-urgent">
-            <span className="chip-num">{urgentCount}</span>
-            <span className="chip-label">Критичних</span>
-          </div>
-          <div className="stat-chip" id="stat-total">
-            <span className="chip-num">{activeTasks.length}</span>
-            <span className="chip-label">Всього</span>
-          </div>
-        </div>
-      </div>
+      <div className="page-header"><div><h1 className="page-title">Dashboard</h1><p className="page-subtitle">Ваш центр керування часом</p></div></div>
 
-      {/* Панель інструментів */}
-      <div className="card toolbar-card">
-        <div className="toolbar-grid">
-          <div className="search-box">
-            <input type="text" placeholder="🔍 Пошук..." value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          <div className="filters-group">
-            <select value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>
-              <option value="all">Усі предмети</option>
-              {uniqueSubjects.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-              <option value="all">Будь-який пріоритет</option>
-              <option value="high">🔥 Високий</option>
-              <option value="medium">⚡ Середній</option>
-              <option value="low">☕ Низький</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Форма додавання */}
       <div className="card form-card">
         <h2 className="card-title">➕ Нове завдання</h2>
         <div className="form-grid">
-          <div className="field">
-            <label>Предмет</label>
-            <input type="text" placeholder="Напр: Алгоритми" value={subject} onChange={e => setSubject(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Тема</label>
-            <input type="text" placeholder="Напр: Лабораторна №4" value={topic} onChange={e => setTopic(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Пріоритет</label>
-            <select value={priority} onChange={e => setPriority(e.target.value)}>
-              <option value="low">☕ Низький</option>
-              <option value="medium">⚡ Середній</option>
-              <option value="high">🔥 Високий</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Дедлайн</label>
-            <input type="datetime-local" value={deadline} onChange={e => setDeadline(e.target.value)} />
+          <div className="field"><label>Предмет / Назва</label><input type="text" value={subject} onChange={e => setSubject(e.target.value)} /></div>
+          <div className="field"><label>Дедлайн</label><input type="datetime-local" value={deadline} onChange={e => setDeadline(e.target.value)} /></div>
+          <div className="field"><label>Оцінка часу (год)</label><input type="number" min="0.5" step="0.5" placeholder="Напр: 4" value={estimatedHours} onChange={e => setEstimatedHours(e.target.value)} /></div>
+          <div className="field"><label>Посилання (Матеріали)</label><input type="url" placeholder="https://docs.google.com/..." value={attachment} onChange={e => setAttachment(e.target.value)} /></div>
+          <div className="field" style={{ gridColumn: '1 / -1' }}>
+            <label>Детальний опис / Умови / Формули</label>
+            <textarea className="textarea-field" rows="3" placeholder="Вимоги викладача, нотатки..." value={description} onChange={e => setDescription(e.target.value)} />
           </div>
         </div>
-        <button className="btn-primary" onClick={handleAddTask}>
-          {user ? 'Створити дедлайн' : 'Увійдіть, щоб додати'}
-        </button>
-      </div>
-
-      {/* Список карток */}
-      <div className="tasks-header">
-        <h2 className="section-heading">Активні завдання</h2>
-        <span className="task-count-badge">{filteredTasks.length}</span>
+        
+        <div className="subtasks-creator">
+          <label className="field-label">Підзадачі (Чекліст)</label>
+          <div className="subtask-input-group">
+            <input type="text" placeholder="Додати крок..." value={subtaskInput} onChange={e => setSubtaskInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddSubtask()} />
+            <button onClick={handleAddSubtask} className="btn-secondary">Додати</button>
+          </div>
+          <ul className="subtasks-preview">{subtasksList.map((st, i) => <li key={i}>🔹 {st.text}</li>)}</ul>
+        </div>
+        <button className="btn-primary mt-3" onClick={handleAddTask}>Створити завдання</button>
       </div>
 
       <div className="tasks-grid">
-        {filteredTasks.length === 0 ? (
-          <div className="empty-state">Поки що немає завдань ☕</div>
-        ) : (
-          filteredTasks.map(task => {
-            const timeInfo = getTimeInfo(task.deadline);
-            return (
-              <div key={task.id} className={`task-card ${timeInfo.class}`}>
-                <div className="task-card-top">
-                  <span className={`badge-prio prio-${task.priority}`}>{getPrioLabel(task.priority)}</span>
-                  <h3 className="task-subject">{task.subject}</h3>
-                  <p className="task-topic">{task.topic}</p>
-                </div>
-                <div className="task-timer">{timeInfo.text}</div>
-                <div className="task-card-bottom">
-                  <span className="task-deadline-text">{formatDate(task.deadline)}</span>
-                  <button className="btn-done-circle" onClick={() => markAsDone(task.id)}>✓</button>
-                </div>
-              </div>
-            );
-          })
-        )}
+        {activeTasks.map(task => <TaskCardItem key={task.id} task={task} updateTask={updateTask} startPomodoro={startPomodoro} />)}
       </div>
     </section>
   );
 }
 
-// --- Компонент Archive ---
-function Archive({ tasks, deleteTask }) {
-  const archiveTasks = tasks.filter(t => t.status !== 'active');
+// --- Картка завдання (З підтримкою розширення) ---
+function TaskCardItem({ task, updateTask, startPomodoro }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const timeInfo = getTimeInfo(task.deadline, task.estimatedHours);
+  
+  const doneSubtasks = task.subtasks?.filter(s => s.isDone).length || 0;
+  const totalSubtasks = task.subtasks?.length || 0;
+  const progress = totalSubtasks === 0 ? 0 : Math.round((doneSubtasks / totalSubtasks) * 100);
+
+  const toggleSubtask = (subtaskId) => {
+    const newSubtasks = task.subtasks.map(st => st.id === subtaskId ? { ...st, isDone: !st.isDone } : st);
+    updateTask(task.id, { subtasks: newSubtasks });
+  };
+
+  const isLongDesc = task.description && task.description.length > 80;
+  const displayDesc = isExpanded ? task.description : task.description?.slice(0, 80) + (isLongDesc && !isExpanded ? '...' : '');
+
+  return (
+    <div className={`task-card ${timeInfo.class}`}>
+      <div className="task-card-top">
+        <span className={`badge-prio prio-${task.priority}`}>{getPrioLabel(task.priority)}</span>
+        <h3 className="task-subject">{task.subject}</h3>
+        
+        {task.description && (
+          <div className="task-description">
+            {displayDesc}
+            {isLongDesc && (
+              <button className="btn-link" onClick={() => setIsExpanded(!isExpanded)}>
+                {isExpanded ? 'Згорнути' : 'Читати далі'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {task.attachment && (
+          <a href={task.attachment} target="_blank" rel="noreferrer" className="attachment-link">🔗 Відкрити матеріали</a>
+        )}
+
+        {timeInfo.warning && <div className="warning-badge">⚠️ Часу менше, ніж оцінено!</div>}
+      </div>
+
+      {totalSubtasks > 0 && (
+        <div className="task-progress">
+          <div className="progress-bar-wrap">
+            <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress === 100 ? 'var(--green)' : 'var(--accent)' }}></div>
+          </div>
+          <div className="subtasks-list">
+            {task.subtasks.map(st => (
+              <label key={st.id} className="subtask-item">
+                <input type="checkbox" checked={st.isDone} onChange={() => toggleSubtask(st.id)} />
+                <span className={st.isDone ? 'st-done' : ''}>{st.text}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="task-card-bottom">
+        <div className="task-timer">{timeInfo.text}</div>
+        <button className="btn-pomodoro" onClick={() => startPomodoro(task)}>🍅 Фокус</button>
+        <button className="btn-done-circle" title="Позначити виконаним" onClick={() => updateTask(task.id, { status: 'done' })}>✓</button>
+      </div>
+    </div>
+  );
+}
+
+// --- KanbanBoard (Без змін, адаптується під тему) ---
+function KanbanBoard({ tasks, updateTask, startPomodoro }) {
+  const columns = [{ id: 'todo', title: '⏳ Треба зробити' }, { id: 'in-progress', title: '🔥 В процесі' }, { id: 'done', title: '✅ Виконано' }];
+  const handleDrop = (e, status) => updateTask(e.dataTransfer.getData('taskId'), { status });
 
   return (
     <section className="section active">
-      <div className="page-header">
-        <h1 className="page-title">Архів</h1>
-        <p className="page-subtitle">Історія виконаних та пропущених робіт</p>
-      </div>
-      <div className="archive-list">
-        {archiveTasks.length === 0 ? <p className="empty-state">Архів порожній</p> : archiveTasks.map(task => (
-          <div key={task.id} className="archive-item">
-            <div className="archive-item-info">
-              <div className="archive-subject">{task.subject} <small>- {task.topic}</small></div>
-              <div className="archive-meta">{formatDate(task.deadline)}</div>
+      <div className="page-header"><h1 className="page-title">Канбан-дошка</h1></div>
+      <div className="kanban-board">
+        {columns.map(col => (
+          <div key={col.id} className="kanban-column" onDragOver={e => e.preventDefault()} onDrop={e => handleDrop(e, col.id)}>
+            <h3 className="kanban-col-title">{col.title}</h3>
+            <div className="kanban-col-content">
+              {tasks.filter(t => t.status === col.id).map(task => (
+                <div key={task.id} className="kanban-card" draggable onDragStart={e => e.dataTransfer.setData('taskId', task.id)}>
+                  <h4>{task.subject}</h4>
+                  <div className="kanban-card-actions mt-2">
+                    <span className="kanban-date">{formatDate(task.deadline).split(',')[0]}</span>
+                    {col.id !== 'done' && <button className="btn-icon" onClick={() => startPomodoro(task)}>🍅</button>}
+                  </div>
+                </div>
+              ))}
             </div>
-            <span className={`archive-status ${task.status}`}>
-              {task.status === 'done' ? 'Виконано' : 'Пропущено'}
-            </span>
-            <button className="btn-delete" onClick={() => deleteTask(task.id)}>✖</button>
           </div>
         ))}
       </div>
@@ -372,60 +344,73 @@ function Archive({ tasks, deleteTask }) {
   );
 }
 
-// --- Компонент Analytics ---
-function Analytics({ tasks }) {
-  const stats = {
-    total: tasks.length,
-    done: tasks.filter(t => t.status === 'done').length,
-    overdue: tasks.filter(t => t.status === 'overdue').length,
-    active: tasks.filter(t => t.status === 'active').length
-  };
-
-  const subjectsMap = {};
-  tasks.forEach(t => { subjectsMap[t.subject] = (subjectsMap[t.subject] || 0) + 1; });
-  const subjectsArray = Object.entries(subjectsMap).sort((a, b) => b[1] - a[1]);
-  const maxTasks = subjectsArray.length > 0 ? subjectsArray[0][1] : 1;
+// --- CalendarView (Без змін, адаптується під тему) ---
+function CalendarView({ tasks }) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+  const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+  const emptyDays = firstDay === 0 ? 6 : firstDay - 1; 
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   return (
     <section className="section active">
-      <div className="page-header">
-        <h1 className="page-title">Аналітика</h1>
-        <p className="page-subtitle">Статистика твоєї успішності</p>
-      </div>
-
-      <div className="analytics-grid">
-        <div className="analytics-card accent-blue">
-          <div className="analytics-num">{stats.total}</div>
-          <div className="analytics-label">Створено</div>
-        </div>
-        <div className="analytics-card accent-green">
-          <div className="analytics-num">{stats.done}</div>
-          <div className="analytics-label">Виконано</div>
-        </div>
-        <div className="analytics-card accent-red">
-          <div className="analytics-num">{stats.overdue}</div>
-          <div className="analytics-label">Прострочено</div>
-        </div>
-        <div className="analytics-card accent-yellow">
-          <div className="analytics-num">{stats.active}</div>
-          <div className="analytics-label">В роботі</div>
+      <div className="page-header calendar-header">
+        <h1 className="page-title">Календар Дедлайнів</h1>
+        <div className="calendar-nav">
+          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}>◀</button>
+          <h2>{currentDate.toLocaleString('uk-UA', { month: 'long', year: 'numeric' })}</h2>
+          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}>▶</button>
         </div>
       </div>
+      <div className="calendar-grid">
+        {['Пн', 'Вв', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].map(d => <div key={d} className="cal-day-header">{d}</div>)}
+        {Array.from({ length: emptyDays }).map((_, i) => <div key={`empty-${i}`} className="cal-day empty"></div>)}
+        {daysArray.map(day => {
+          const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const dayTasks = tasks.filter(t => t.deadline.startsWith(dateStr));
+          return (
+            <div key={day} className={`cal-day ${dayTasks.length > 0 ? 'has-tasks' : ''}`}>
+              <span className="day-num">{day}</span>
+              <div className="cal-tasks">{dayTasks.map(t => <div key={t.id} className={`cal-task-chip prio-${t.priority}`}>{t.subject}</div>)}</div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
-      <div className="card" style={{ marginTop: '28px' }}>
-        <h2 className="card-title">Навантаження за предметами</h2>
-        <div className="subjects-table">
-          {subjectsArray.length === 0 ? <p className="empty-state">Немає даних</p> : subjectsArray.map(([subject, count]) => (
-            <div key={subject} className="subject-row">
-              <span className="subject-name">{subject}</span>
-              <div className="subject-bar-wrap">
-                <div className="subject-bar" style={{ width: `${(count / maxTasks) * 100}%` }}></div>
+// --- Оновлений красивий Архів ---
+function Archive({ tasks, updateTask, deleteTask }) {
+  const archiveTasks = tasks.filter(t => t.status === 'done' || t.status === 'overdue');
+
+  return (
+    <section className="section active">
+      <div className="page-header"><h1 className="page-title">Архів</h1><p className="page-subtitle">Виконані та пропущені завдання</p></div>
+      
+      {archiveTasks.length === 0 ? (
+        <div className="empty-state" style={{ textAlign: 'center', marginTop: '50px', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: '3rem' }}>🍃</span><p>Архів порожній</p>
+        </div>
+      ) : (
+        <div className="archive-grid">
+          {archiveTasks.map(task => (
+            <div key={task.id} className={`archive-card ${task.status}`}>
+              <div className="archive-header">
+                <span className={`archive-badge ${task.status}`}>{task.status === 'done' ? '✅ Виконано' : '❌ Прострочено'}</span>
+                <span className="archive-date">{formatDate(task.deadline).split(',')[0]}</span>
               </div>
-              <span className="subject-count">{count}</span>
+              <h3 style={{ marginBottom: '8px' }}>{task.subject}</h3>
+              {task.description && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{task.description.slice(0, 50)}...</p>}
+              
+              <div className="archive-actions">
+                <button className="btn-restore" onClick={() => updateTask(task.id, { status: 'todo' })}>🔄 Відновити</button>
+                <button className="btn-delete-forever" onClick={() => deleteTask(task.id)}>🗑 Видалити</button>
+              </div>
             </div>
           ))}
         </div>
-      </div>
+      )}
     </section>
   );
 }
