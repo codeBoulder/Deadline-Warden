@@ -6,7 +6,7 @@
   /* Кольори макета */
   --sidebar-bg:    #0f1117;
   --sidebar-width: 240px;
-  --content-bg:    #f9fafb; /* Трохи світліший фон для чистоти */
+  --content-bg:    #f9fafb; 
   --surface:       #ffffff;
   
   /* Текст */
@@ -26,7 +26,7 @@
   --red-light:     #fee2e2;
   --gray-light:    #f3f4f6;
 
-  /* Дизайн-токени: менші радіуси, тонкі бордери, легкі тіні */
+  /* Дизайн-токени */
   --radius-md:     8px;
   --radius-lg:     12px;
   --border-light:  1px solid #e5e7eb;
@@ -42,26 +42,18 @@ button { cursor: pointer; font-family: inherit; }
 
 body {
   font-family: 'Lato', sans-serif;
+  
+  /* Колір фону */
+  background-color: var(--content-bg);
+  
+  /* 100% надійний закодований у Base64 фіолетовий фон із символами */
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjI0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSIjOGI1Y2Y2IiBvcGFjaXR5PSIwLjE1IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXdlaWdodD0iYm9sZCI+PHRleHQgeD0iMjAiIHk9IjQwIiBmb250LXNpemU9IjIyIj57IH08L3RleHQ+PHRleHQgeD0iMTQwIiB5PSI2MCIgZm9udC1zaXplPSIyOCI+4oiRPC90ZXh0Pjx0ZXh0IHg9IjUwIiB5PSIxNDAiIGZvbnQtc2l6ZT0iMjAiPiZsdDsvJmd0OzwvdGV4dD48dGV4dCB4PSIxODAiIHk9IjE3MCIgZm9udC1zaXplPSIyOCI+4ourPC90ZXh0Pjx0ZXh0IHg9IjE2MCIgeT0iMzAiIGZvbnQtc2l6ZT0iMTgiPs67PC90ZXh0Pjx0ZXh0IHg9IjEwIiB5PSIyMTAiIGZvbnQtc2l6ZT0iMjIiPisrPC90ZXh0Pjx0ZXh0IHg9IjkwIiB5PSIyMDAiIGZvbnQtc2l6ZT0iMjQiPs+APC90ZXh0Pjx0ZXh0IHg9IjgwIiB5PSI1MCIgZm9udC1zaXplPSIxOCI+PSZndDs8L3RleHQ+PHRleHQgeD0iMjAwIiB5PSIxMTAiIGZvbnQtc2l6ZT0iMjAiPiE9PC90ZXh0Pjx0ZXh0IHg9IjQwIiB5PSIyMzAiIGZvbnQtc2l6ZT0iMjQiPuKInjwvdGV4dD48dGV4dCB4PSIxMTAiIHk9IjEyMCIgZm9udC1zaXplPSIyMCI+IzwvdGV4dD48L2c+PC9zdmc+");
+  background-repeat: repeat;
+  background-attachment: fixed; /* Щоб фон не смикався при скролінгу */
+  
   color: var(--text-primary);
   min-height: 100vh;
   line-height: 1.5;
-  
-  /* Фон + закодований у Base64 патерн з символами */
-  background-color: var(--content-bg);
-  background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjI0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSIjOWNhM2FmIiBvcGFjaXR5PSIwLjExIiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXdlaWdodD0iYm9sZCI+PHRleHQgeD0iMjAiIHk9IjQwIiBmb250LXNpemU9IjIyIj57IH08L3RleHQ+PHRleHQgeD0iMTQwIiB5PSI2MCIgZm9udC1zaXplPSIyOCI+4oiRPC90ZXh0Pjx0ZXh0IHg9IjUwIiB5PSIxNDAiIGZvbnQtc2l6ZT0iMjAiPiZsdDsvJmd0OzwvdGV4dD48dGV4dCB4PSIxODAiIHk9IjE3MCIgZm9udC1zaXplPSIyOCI+4oirPC90ZXh0Pjx0ZXh0IHg9IjE2MCIgeT0iMzAiIGZvbnQtc2l6ZT0iMTgiPs67PC90ZXh0Pjx0ZXh0IHg9IjEwIiB5PSIyMTAiIGZvbnQtc2l6ZT0iMjIiPisrPC90ZXh0Pjx0ZXh0IHg9IjkwIiB5PSIyMDAiIGZvbnQtc2l6ZT0iMjQiPs+APC90ZXh0Pjx0ZXh0IHg9IjgwIiB5PSI1MCIgZm9udC1zaXplPSIxOCI+PSZndDs8L3RleHQ+PHRleHQgeD0iMjAwIiB5PSIxMTAiIGZvbnQtc2l6ZT0iMjAiPiE9PC90ZXh0Pjx0ZXh0IHg9IjQwIiB5PSIyMzAiIGZvbnQtc2l6ZT0iMjQiPuKInjwvdGV4dD48dGV4dCB4PSIxMTAiIHk9IjEyMCIgZm9udC1zaXplPSIyMCI+IzwvdGV4dD48L2c+PC9zdmc+");
-  background-repeat: repeat;
-}
-/* ── Напівпрозорий фон з символами ── */
-body::before {
-  content: "";
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  z-index: -1;
-  pointer-events: none;
-  
-  /* Картинка генерується прямо з цього коду: */
-  background-image: url("data:image/svg+xml,%3Csvg width='240' height='240' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239ca3af' opacity='0.08' font-family='monospace' font-weight='bold'%3E%3Ctext x='20' y='40' font-size='22'%3E%7B %7D%3C/text%3E%3Ctext x='140' y='60' font-size='28'%3E∑%3C/text%3E%3Ctext x='50' y='140' font-size='20'%3E%3C/%3E%3C/text%3E%3Ctext x='180' y='170' font-size='28'%3E∫%3C/text%3E%3Ctext x='160' y='30' font-size='18'%3Eλ%3C/text%3E%3Ctext x='10' y='210' font-size='22'%3E++%3C/text%3E%3Ctext x='90' y='200' font-size='24'%3Eπ%3C/text%3E%3Ctext x='80' y='50' font-size='18'%3E=%3E%3C/text%3E%3Ctext x='200' y='110' font-size='20'%3E!=%3C/text%3E%3Ctext x='40' y='230' font-size='24'%3E∞%3C/text%3E%3Ctext x='110' y='120' font-size='20'%3E%23%3C/text%3E%3C/g%3E%3C/svg%3E");
-  background-repeat: repeat;
 }
 
 /* ════════════════════════════════════════
@@ -113,12 +105,11 @@ body::before {
   padding: 40px 30px; 
 }
 
-/* Секція не розтягується безкінечно, а акуратно стоїть по центру */
 .section { 
   display: none; 
   animation: fadeIn .25s ease; 
   width: 100%; 
-  max-width: 1040px; /* Ідеальна ширина для сприйняття */
+  max-width: 1040px; 
   margin: 0 auto; 
 }
 
@@ -139,7 +130,14 @@ body::before {
   border-radius: var(--radius-md); border: var(--border-light);
   box-shadow: var(--shadow-sm); text-align: center; 
 }
-.chip-num { display: block; font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 800; color: var(--accent); line-height: 1.1;}
+.chip-num { 
+  display: block; 
+  font-family: 'Lato', sans-serif; /* Виправлено шрифт для нормального вигляду */
+  font-size: 1.5rem; 
+  font-weight: 800; 
+  color: var(--accent); 
+  line-height: 1.1;
+}
 #stat-urgent .chip-num { color: var(--red); }
 .chip-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
 
@@ -214,7 +212,8 @@ body::before {
 .status-red { border-left-color: var(--red); }
 
 .task-timer { 
-  display: inline-block; margin: 10px 0; font-family: 'Syne', sans-serif; 
+  display: inline-block; margin: 10px 0; 
+  font-family: 'Lato', sans-serif; /* Виправлено шрифт */
   font-weight: 700; font-size: 0.8rem; padding: 4px 10px; border-radius: 20px; 
 }
 .status-green .task-timer { background: var(--green-light); color: var(--green); }
@@ -237,7 +236,14 @@ body::before {
 .accent-red { border-top-color: var(--red); } 
 .accent-yellow { border-top-color: var(--yellow); }
 
-.analytics-num { font-family: 'Syne', sans-serif; font-size: 2.2rem; font-weight: 800; line-height: 1; margin-bottom: 4px; display: block; }
+.analytics-num { 
+  font-family: 'Lato', sans-serif; /* Виправлено шрифт */
+  font-size: 2.4rem; 
+  font-weight: 800; 
+  line-height: 1; 
+  margin-bottom: 4px; 
+  display: block; 
+}
 .analytics-label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
 /* Таблиця предметів */
@@ -246,7 +252,7 @@ body::before {
 .subject-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .subject-bar-wrap { height: 8px; background: #f1f5f9; border-radius: 10px; overflow: hidden; }
 .subject-bar { height: 100%; background: var(--accent); border-radius: 10px; transition: width 1s ease; }
-.subject-count { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.85rem; text-align: right; color: var(--text-muted); }
+.subject-count { font-family: 'Lato', sans-serif; font-weight: 700; font-size: 0.9rem; text-align: right; color: var(--text-muted); }
 
 /* ════════════════════════════════════════
    АРХІВ
