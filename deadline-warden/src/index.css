@@ -1209,3 +1209,164 @@ h1, h2, h3, h4, h5, h6 {
     display: block;
   }
 }
+
+/* Планшети */
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: 0;
+    padding: 24px;
+    padding-top: 80px;
+  }
+  
+  .sidebar {
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-md); 
+  }
+  
+  .sidebar.active {
+    transform: translateX(0);
+  }
+  
+  .mobile-nav-toggle {
+    display: block;
+  }
+}
+
+@media (max-width: 768px) {
+  
+  .page-title {
+    font-size: 2rem; 
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr; 
+  }
+  
+  .tasks-grid, 
+  .archive-grid {
+    grid-template-columns: 1fr; 
+  }
+  
+  .task-card {
+    padding: 20px;
+  }
+  
+  /* Адаптація календаря */
+  .calendar-grid {
+    padding: 16px;
+    gap: 4px;
+  }
+  
+  .cal-day-header {
+    font-size: 0.75rem;
+    padding-bottom: 8px;
+  }
+  
+  .cal-day {
+    min-height: 80px;
+    padding: 4px;
+  }
+  
+  .cal-task-chip {
+    font-size: 0.65rem;
+    padding: 4px;
+    border-radius: 4px;
+  }
+
+  .calendar-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .calendar-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .kanban-column {
+    min-width: 280px; 
+  }
+  .kanban-board {
+    flex-direction: column; 
+    overflow-x: hidden;    
+    min-height: auto;
+    gap: 16px;             
+  }
+  
+  .kanban-column {
+    width: 100%;           
+    min-width: 100%;
+    padding: 16px;          
+  }
+
+  .kanban-col-title {
+    margin-bottom: 16px;
+  }
+}
+
+
+@media (max-width: 480px) {
+  .main-content {
+    padding: 16px;
+    padding-top: 70px;
+  }
+  
+  .form-card {
+    padding: 20px;
+  }
+  
+  .pomodoro-widget {
+    width: auto;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    padding: 24px 20px;
+  }
+  
+  .pomo-time {
+    font-size: 3.5rem;
+  }
+  
+  .auth-modal {
+    padding: 32px 24px;
+  }
+  
+  /* Перебудова карток завдань */
+  .badge-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .task-card-bottom {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .task-actions {
+    justify-content: space-between;
+  }
+  
+  .task-actions button {
+    flex: 1; 
+  }
+}
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 399; /* Трохи менше ніж у сайдбару (400) */
+  animation: fadeIn 0.3s ease;
+}
+
+@media (min-width: 1025px) {
+  .sidebar-overlay {
+    display: none;
+  }
+}

@@ -139,7 +139,7 @@ export default function App() {
       <button className="mobile-nav-toggle" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
         <Icon name={isSidebarOpen ? "close" : "menu"} />
       </button>
-
+      {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>}
       <aside className={`sidebar ${isSidebarOpen ? 'active' : ''}`}>
         <div className="sidebar-logo">
           <div className="logo-icon"><Icon name="hourglass_bottom" /></div>
