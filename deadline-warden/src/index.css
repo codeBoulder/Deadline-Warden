@@ -308,3 +308,131 @@ body {
   .header-stats { display: none; }
   .subject-row { grid-template-columns: 100px 1fr 30px; }
 }
+
+/* =========================================
+   КРАСИВІ КНОПКИ САЙДБАРУ ТА АВТОРИЗАЦІЇ
+========================================= */
+
+/* Кнопка "Увійти / Реєстрація" в меню */
+.btn-login-sidebar {
+  background: linear-gradient(135deg, var(--accent), #3b82f6);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 12px;
+  border-radius: 12px;
+  width: 100%;
+  text-align: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.btn-login-sidebar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.btn-login-sidebar:active {
+  transform: translateY(0);
+}
+
+/* Кнопка "Вийти з акаунту" */
+.btn-logout-simple {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 10px 12px;
+  border-radius: 10px;
+  width: 100%;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.btn-logout-simple:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #dc2626;
+}
+
+/* Кругла кнопка виконання дедлайну (✓) */
+.btn-done-circle {
+  background: var(--green-light);
+  color: var(--green);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 1.1rem;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-done-circle:hover {
+  background: var(--green);
+  color: white;
+  transform: scale(1.15) rotate(10deg);
+  box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3);
+}
+
+/* Красивий порожній стан (коли немає завдань) */
+.empty-state {
+  grid-column: 1 / -1;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 1.1rem;
+  background: rgba(255, 255, 255, 0.4);
+  border: 2px dashed var(--border-light);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* =========================================
+   МОДАЛЬНЕ ВІКНО АВТОРИЗАЦІЇ
+========================================= */
+.auth-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+.auth-modal {
+  background: var(--surface); padding: 32px; 
+  border-radius: var(--radius-lg);
+  width: 90%; max-width: 400px; 
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  position: relative;
+  border: var(--border-light);
+}
+
+.auth-close-btn {
+  position: absolute; top: 16px; right: 16px;
+  background: transparent; border: none; font-size: 1.2rem;
+  color: var(--text-muted); cursor: pointer; transition: color var(--transition);
+}
+
+.auth-close-btn:hover { color: var(--text-primary); }
+
+.btn-login {
+  background: var(--accent); color: #fff; border: none;
+  padding: 12px 16px; border-radius: var(--radius-md); 
+  font-weight: 700; width: 100%; margin-top: 10px; font-size: 0.95rem;
+  transition: background var(--transition);
+}
+
+.btn-login:hover { background: var(--accent-hover); }

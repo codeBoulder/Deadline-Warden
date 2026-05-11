@@ -1,6 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import './index.css'; // Ваш файл зі стилями
+import './index.css';
+import Auth from './Auth'; 
+import { auth, db } from './firebase'; 
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { 
+  collection, 
+  query, 
+  where, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  doc, 
+  deleteDoc,
+  serverTimestamp 
+} from 'firebase/firestore';
 
+// --- Допоміжні функції ---
 const getPrioLabel = (p) => {
   if (p === 'high') return '🔥';
   if (p === 'medium') return '⚡';
@@ -16,65 +31,105 @@ const getTimeInfo = (deadlineString) => {
 };
 
 const formatDate = (iso) => {
-  return new Date(iso).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString('uk-UA', { 
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+  });
 };
 
-
+// --- Основний компонент App ---
 export default function App() {
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem('dw_tasks');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [user, setUser] = useState(null);
+  const [tasks, setTasks] = useState([]);
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
+  // 1. Слідкуємо за станом авторизації
   useEffect(() => {
-    localStorage.setItem('dw_tasks', JSON.stringify(tasks));
-  }, [tasks]);
-  useEffect(() => {
-    const checkOverdue = () => {
-      setTasks(prevTasks => prevTasks.map(task => {
-        if (task.status === 'active' && new Date(task.deadline).getTime() < Date.now()) {
-          return { ...task, status: 'overdue' };
-        }
-        return task;
-      }));
-    };
-    checkOverdue(); 
-    const interval = setInterval(checkOverdue, 60000);
-    return () => clearInterval(interval);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
   }, []);
 
-  const addTask = (newTask) => {
-    setTasks([...tasks, newTask]);
-    setActiveSection('dashboard');
-  };
+  // 2. Отримуємо завдання з Firestore (тільки для поточного юзера)
+  useEffect(() => {
+    if (!user) {
+      setTasks([]); // Якщо вийшов — очищуємо список
+      return;
+    }
 
-  const markAsDone = (id) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, status: 'done' } : t));
-  };
+    const q = query(collection(db, "tasks"), where("userId", "==", user.uid));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const tasksData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setTasks(tasksData);
+    });
 
-  const deleteTask = (id) => {
-    if (window.confirm('Видалити назавжди?')) {
-      setTasks(tasks.filter(t => t.id !== id));
+    return () => unsubscribe();
+  }, [user]);
+
+  // 3. Перевірка прострочених завдань раз на хвилину
+  useEffect(() => {
+    const interval = setInterval(() => {
+      tasks.forEach(async (task) => {
+        if (task.status === 'active' && new Date(task.deadline).getTime() < Date.now()) {
+          const taskRef = doc(db, "tasks", task.id);
+          await updateDoc(taskRef, { status: 'overdue' });
+        }
+      });
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [tasks]);
+
+  // Операції з БД
+  const addTask = async (newTask) => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    try {
+      await addDoc(collection(db, "tasks"), {
+        ...newTask,
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+      setActiveSection('dashboard');
+    } catch (e) {
+      console.error("Помилка додавання:", e);
     }
   };
+
+  const markAsDone = async (id) => {
+    const taskRef = doc(db, "tasks", id);
+    await updateDoc(taskRef, { status: 'done' });
+  };
+
+  const deleteTask = async (id) => {
+    if (window.confirm('Видалити назавжди?')) {
+      await deleteDoc(doc(db, "tasks", id));
+    }
+  };
+
+  const handleLogout = () => signOut(auth);
 
   const activeTasksCount = tasks.filter(t => t.status === 'active').length;
 
   return (
     <>
-     
+      {/* Мобільний хедер */}
       <div className="mobile-header">
         <div className="logo-wrap">
           <span className="logo-icon">⏳</span>
           <span className="logo-text">Deadline<strong>Warden</strong></span>
         </div>
-        <button className="burger-btn" onClick={() => setIsSidebarOpen(true)} aria-label="Меню">
+        <button className="burger-btn" onClick={() => setIsSidebarOpen(true)}>
           <span></span><span></span><span></span>
         </button>
       </div>
-
 
       <div 
         className={`sidebar-overlay ${isSidebarOpen ? 'active' : ''}`} 
@@ -82,7 +137,7 @@ export default function App() {
       ></div>
 
       <div className="app-shell">
-       
+        {/* Сайдбар */}
         <aside className="sidebar" style={{ transform: isSidebarOpen ? 'translateX(0)' : '' }}>
           <div className="sidebar-logo">
             <span className="logo-icon">⏳</span>
@@ -90,35 +145,59 @@ export default function App() {
           </div>
 
           <nav className="sidebar-nav">
-            <a href="#" className={`nav-link ${activeSection === 'dashboard' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveSection('dashboard'); setIsSidebarOpen(false); }}>
+            <button className={`nav-link ${activeSection === 'dashboard' ? 'active' : ''}`} onClick={() => { setActiveSection('dashboard'); setIsSidebarOpen(false); }}>
               <span className="nav-icon">🏠</span> Dashboard
-            </a>
-            <a href="#" className={`nav-link ${activeSection === 'archive' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveSection('archive'); setIsSidebarOpen(false); }}>
+            </button>
+            <button className={`nav-link ${activeSection === 'archive' ? 'active' : ''}`} onClick={() => { setActiveSection('archive'); setIsSidebarOpen(false); }}>
               <span className="nav-icon">📦</span> Архів
-            </a>
-            <a href="#" className={`nav-link ${activeSection === 'analytics' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveSection('analytics'); setIsSidebarOpen(false); }}>
+            </button>
+            <button className={`nav-link ${activeSection === 'analytics' ? 'active' : ''}`} onClick={() => { setActiveSection('analytics'); setIsSidebarOpen(false); }}>
               <span className="nav-icon">📊</span> Аналітика
-            </a>
+            </button>
           </nav>
 
-          <div className="sidebar-footer">
-            <div className="status-dot"></div>
-            <span>{activeTasksCount} активних</span>
+          <div className="sidebar-footer" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '15px'}}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+              <div className="status-dot" style={{background: user ? 'var(--green)' : '#94a3b8'}}></div>
+              <span>{user ? `${activeTasksCount} активних` : 'Гість'}</span>
+            </div>
+            
+            {user ? (
+              <button onClick={handleLogout} className="btn-logout-simple">
+                🚪 Вийти з акаунту
+              </button>
+            ) : (
+              <button onClick={() => setIsAuthModalOpen(true)} className="btn-login-sidebar">
+                👤 Увійти / Реєстрація
+              </button>
+            )}
           </div>
         </aside>
 
+        {/* Основний контент */}
         <main className="main-content">
-          {activeSection === 'dashboard' && <Dashboard tasks={tasks} addTask={addTask} markAsDone={markAsDone} />}
+          {activeSection === 'dashboard' && (
+            <Dashboard 
+              tasks={tasks} 
+              addTask={addTask} 
+              markAsDone={markAsDone} 
+              user={user}
+              onRequireAuth={() => setIsAuthModalOpen(true)}
+            />
+          )}
           {activeSection === 'archive' && <Archive tasks={tasks} deleteTask={deleteTask} />}
           {activeSection === 'analytics' && <Analytics tasks={tasks} />}
         </main>
       </div>
+
+      {/* Модалка авторизації */}
+      {isAuthModalOpen && <Auth onClose={() => setIsAuthModalOpen(false)} />}
     </>
   );
 }
 
-
-function Dashboard({ tasks, addTask, markAsDone }) {
+// --- Компонент Dashboard ---
+function Dashboard({ tasks, addTask, markAsDone, user, onRequireAuth }) {
   const [search, setSearch] = useState('');
   const [filterSubject, setFilterSubject] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
@@ -128,14 +207,13 @@ function Dashboard({ tasks, addTask, markAsDone }) {
   const [priority, setPriority] = useState('medium');
   const [deadline, setDeadline] = useState('');
 
-  const uniqueSubjects = useMemo(() => {
-    return [...new Set(tasks.map(t => t.subject))];
-  }, [tasks]);
+  const uniqueSubjects = useMemo(() => [...new Set(tasks.map(t => t.subject))], [tasks]);
 
   const activeTasks = tasks.filter(t => t.status === 'active');
   const filteredTasks = useMemo(() => {
     return activeTasks.filter(t => {
-      const matchSearch = t.subject.toLowerCase().includes(search.toLowerCase()) || t.topic.toLowerCase().includes(search.toLowerCase());
+      const matchSearch = t.subject.toLowerCase().includes(search.toLowerCase()) || 
+                          t.topic.toLowerCase().includes(search.toLowerCase());
       const matchSubj = filterSubject === 'all' || t.subject === filterSubject;
       const matchPrio = filterPriority === 'all' || t.priority === filterPriority;
       return matchSearch && matchSubj && matchPrio;
@@ -145,18 +223,20 @@ function Dashboard({ tasks, addTask, markAsDone }) {
   const urgentCount = filteredTasks.filter(t => getTimeInfo(t.deadline).isUrgent).length;
 
   const handleAddTask = () => {
+    if (!user) {
+      onRequireAuth();
+      return;
+    }
     if (!subject.trim() || !deadline) {
       alert('Заповніть предмет та дату!');
       return;
     }
     addTask({
-      id: Date.now().toString(),
       subject: subject.trim(),
       topic: topic.trim() || 'Без опису',
       priority,
       deadline,
-      status: 'active',
-      createdAt: new Date().toISOString()
+      status: 'active'
     });
     setSubject(''); setTopic(''); setDeadline(''); setPriority('medium');
   };
@@ -180,10 +260,11 @@ function Dashboard({ tasks, addTask, markAsDone }) {
         </div>
       </div>
 
+      {/* Панель інструментів */}
       <div className="card toolbar-card">
         <div className="toolbar-grid">
           <div className="search-box">
-            <input type="text" placeholder="🔍 Пошук за темою або предметом..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input type="text" placeholder="🔍 Пошук..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className="filters-group">
             <select value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>
@@ -200,6 +281,7 @@ function Dashboard({ tasks, addTask, markAsDone }) {
         </div>
       </div>
 
+      {/* Форма додавання */}
       <div className="card form-card">
         <h2 className="card-title">➕ Нове завдання</h2>
         <div className="form-grid">
@@ -224,9 +306,12 @@ function Dashboard({ tasks, addTask, markAsDone }) {
             <input type="datetime-local" value={deadline} onChange={e => setDeadline(e.target.value)} />
           </div>
         </div>
-        <button className="btn-primary" onClick={handleAddTask}>Створити дедлайн</button>
+        <button className="btn-primary" onClick={handleAddTask}>
+          {user ? 'Створити дедлайн' : 'Увійдіть, щоб додати'}
+        </button>
       </div>
 
+      {/* Список карток */}
       <div className="tasks-header">
         <h2 className="section-heading">Активні завдання</h2>
         <span className="task-count-badge">{filteredTasks.length}</span>
@@ -234,23 +319,21 @@ function Dashboard({ tasks, addTask, markAsDone }) {
 
       <div className="tasks-grid">
         {filteredTasks.length === 0 ? (
-          <div className="empty-state" style={{gridColumn: '1 / -1', padding: '20px', textAlign: 'center', color: 'var(--text-muted)'}}>Нічого не знайдено ☕</div>
+          <div className="empty-state">Поки що немає завдань ☕</div>
         ) : (
           filteredTasks.map(task => {
             const timeInfo = getTimeInfo(task.deadline);
             return (
               <div key={task.id} className={`task-card ${timeInfo.class}`}>
                 <div className="task-card-top">
-                  <div>
-                    <span className={`badge-prio prio-${task.priority}`}>{getPrioLabel(task.priority)}</span>
-                    <h3 className="task-subject">{task.subject}</h3>
-                    <p className="task-topic">{task.topic}</p>
-                  </div>
+                  <span className={`badge-prio prio-${task.priority}`}>{getPrioLabel(task.priority)}</span>
+                  <h3 className="task-subject">{task.subject}</h3>
+                  <p className="task-topic">{task.topic}</p>
                 </div>
                 <div className="task-timer">{timeInfo.text}</div>
-                <div className="task-card-bottom" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                  <span className="task-deadline-text" style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>{formatDate(task.deadline)}</span>
-                  <button className="btn-done" onClick={() => markAsDone(task.id)} style={{background: 'var(--green-light)', color: 'var(--green)', border: 'none', borderRadius: '50%', width: '30px', height: '30px'}}>✓</button>
+                <div className="task-card-bottom">
+                  <span className="task-deadline-text">{formatDate(task.deadline)}</span>
+                  <button className="btn-done-circle" onClick={() => markAsDone(task.id)}>✓</button>
                 </div>
               </div>
             );
@@ -261,6 +344,7 @@ function Dashboard({ tasks, addTask, markAsDone }) {
   );
 }
 
+// --- Компонент Archive ---
 function Archive({ tasks, deleteTask }) {
   const archiveTasks = tasks.filter(t => t.status !== 'active');
 
@@ -271,13 +355,15 @@ function Archive({ tasks, deleteTask }) {
         <p className="page-subtitle">Історія виконаних та пропущених робіт</p>
       </div>
       <div className="archive-list">
-        {archiveTasks.length === 0 ? <p>Архів порожній</p> : archiveTasks.map(task => (
+        {archiveTasks.length === 0 ? <p className="empty-state">Архів порожній</p> : archiveTasks.map(task => (
           <div key={task.id} className="archive-item">
             <div className="archive-item-info">
-              <div className="archive-subject">{task.subject} <span style={{fontWeight: 'normal', color: 'var(--text-muted)'}}>- {task.topic}</span></div>
+              <div className="archive-subject">{task.subject} <small>- {task.topic}</small></div>
               <div className="archive-meta">{formatDate(task.deadline)}</div>
             </div>
-            <span className={`archive-status ${task.status}`}>{task.status === 'done' ? 'Виконано' : 'Пропущено'}</span>
+            <span className={`archive-status ${task.status}`}>
+              {task.status === 'done' ? 'Виконано' : 'Пропущено'}
+            </span>
             <button className="btn-delete" onClick={() => deleteTask(task.id)}>✖</button>
           </div>
         ))}
@@ -286,18 +372,17 @@ function Archive({ tasks, deleteTask }) {
   );
 }
 
-
+// --- Компонент Analytics ---
 function Analytics({ tasks }) {
-  const total = tasks.length;
-  const done = tasks.filter(t => t.status === 'done').length;
-  const overdue = tasks.filter(t => t.status === 'overdue').length;
-  const active = tasks.filter(t => t.status === 'active').length;
+  const stats = {
+    total: tasks.length,
+    done: tasks.filter(t => t.status === 'done').length,
+    overdue: tasks.filter(t => t.status === 'overdue').length,
+    active: tasks.filter(t => t.status === 'active').length
+  };
 
   const subjectsMap = {};
-  tasks.forEach(t => {
-    subjectsMap[t.subject] = (subjectsMap[t.subject] || 0) + 1;
-  });
-  
+  tasks.forEach(t => { subjectsMap[t.subject] = (subjectsMap[t.subject] || 0) + 1; });
   const subjectsArray = Object.entries(subjectsMap).sort((a, b) => b[1] - a[1]);
   const maxTasks = subjectsArray.length > 0 ? subjectsArray[0][1] : 1;
 
@@ -310,27 +395,27 @@ function Analytics({ tasks }) {
 
       <div className="analytics-grid">
         <div className="analytics-card accent-blue">
-          <div className="analytics-num">{total}</div>
+          <div className="analytics-num">{stats.total}</div>
           <div className="analytics-label">Створено</div>
         </div>
         <div className="analytics-card accent-green">
-          <div className="analytics-num">{done}</div>
+          <div className="analytics-num">{stats.done}</div>
           <div className="analytics-label">Виконано</div>
         </div>
         <div className="analytics-card accent-red">
-          <div className="analytics-num">{overdue}</div>
+          <div className="analytics-num">{stats.overdue}</div>
           <div className="analytics-label">Прострочено</div>
         </div>
         <div className="analytics-card accent-yellow">
-          <div className="analytics-num">{active}</div>
+          <div className="analytics-num">{stats.active}</div>
           <div className="analytics-label">В роботі</div>
         </div>
       </div>
 
       <div className="card" style={{ marginTop: '28px' }}>
-        <h2 className="card-title">Розподіл навантаження</h2>
+        <h2 className="card-title">Навантаження за предметами</h2>
         <div className="subjects-table">
-          {subjectsArray.length === 0 ? <p style={{color: 'var(--text-muted)'}}>Немає даних</p> : subjectsArray.map(([subject, count]) => (
+          {subjectsArray.length === 0 ? <p className="empty-state">Немає даних</p> : subjectsArray.map(([subject, count]) => (
             <div key={subject} className="subject-row">
               <span className="subject-name">{subject}</span>
               <div className="subject-bar-wrap">
